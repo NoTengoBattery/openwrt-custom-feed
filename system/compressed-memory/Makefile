@@ -17,9 +17,9 @@ include $(INCLUDE_DIR)/package.mk
 
 
 define Package/compressed-memory
-  SECTION:=utils
-  CATEGORY:=Base system
-  DEPENDS:= \
+	SECTION:=utils
+	CATEGORY:=Base system
+	DEPENDS:= \
 	+kmod-crypto-deflate \
 	+kmod-crypto-zstd \
 	+kmod-lib-lz4 \
@@ -30,57 +30,57 @@ define Package/compressed-memory
 	+@BUSYBOX_CONFIG_FEATURE_SWAPON_DISCARD \
 	+@BUSYBOX_CONFIG_FEATURE_SWAPON_PRI \
 	+@BUSYBOX_CONFIG_SWAPOFF
-  HIDDEN:=1
-  TITLE:=Configuration files for compressed-memory
-  MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
-  URL:=https://notengobattery.com/
-  PKGARCH:=all
+	HIDDEN:=1
+	TITLE:=Configuration files for compressed-memory
+	MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
+	URL:=https://notengobattery.com/
+	PKGARCH:=all
 endef
 
 
 define Package/compressed-memory/description
- Installs a UCI file which contains pre-computed values for packages that belong
- to compressed-memory.
+	Installs a UCI file which contains pre-computed values for packages that belong
+	to compressed-memory.
 endef
 
 
 define Package/swap-zram
-  SECTION:=utils
-  CATEGORY:=Base system
-  DEPENDS:= +compressed-memory \
+	SECTION:=utils
+	CATEGORY:=Base system
+	DEPENDS:= +compressed-memory \
 	+kmod-loop \
 	+kmod-zram-writeback \
 	+losetup
-  TITLE:=Script to manage compressed memory for swap
-  MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
-  URL:=https://notengobattery.com/
-  PKGARCH:=all
+	TITLE:=Script to manage compressed memory for swap
+	MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
+	URL:=https://notengobattery.com/
+	PKGARCH:=all
 endef
 
 
 define Package/swap-zram/description
- A script for managing the ZRAM compressed block device for swapping. This
- allows the system to trade-off CPU cycles for the chance of shortening the
- unused RAM size, freeing it for other uses.
+	A script for managing the ZRAM compressed block device for swapping. This
+	allows the system to trade-off CPU cycles for the chance of shortening the
+	unused RAM size, freeing it for other uses.
 endef
 
 
 define Package/swap-zswap
-  SECTION:=utils
-  CATEGORY:=Base system
-  DEPENDS:= +compressed-memory \
+	SECTION:=utils
+	CATEGORY:=Base system
+	DEPENDS:= +compressed-memory \
 	+kmod-zswap
-  TITLE:=Script to manage compressed LRU cache for swap
-  MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
-  URL:=https://notengobattery.com/
-  PKGARCH:=all
+	TITLE:=Script to manage compressed LRU cache for swap
+	MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
+	URL:=https://notengobattery.com/
+	PKGARCH:=all
 endef
 
 
 define Package/swap-zswap/description
- A script for managing the ZSWAP front swap. This is a Linux feature where
- pages land and get compressed before hitting the actual swap device, allowing
- the system to trade CPU cycles for the chance of saving I/O bandwidth.
+	A script for managing the ZSWAP front swap. This is a Linux feature where
+	pages land and get compressed before hitting the actual swap device, allowing
+	the system to trade CPU cycles for the chance of saving I/O bandwidth.
 endef
 
 
