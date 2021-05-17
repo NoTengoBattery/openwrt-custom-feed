@@ -15,7 +15,7 @@ OVERLAYFS=/overlayfs
 ETC_CONFIG_OVERLAY=${OVERLAYFS}${ETC_CONFIG_UPPER}
 
 prepare_root_ntb() {
-  exec &>/dev/null
+_prepare_root_ntb() {
   printf "prepare_root: running external root filesystem preparation" > /dev/kmsg
   mknod_dev() { rm -f $1; mknod -m 600 $1 $2 $MAJOR $MINOR; }
   case $(board_name) in
@@ -62,33 +62,28 @@ prepare_root_ntb() {
     eval "$(cat $OVERLAY_UEVENT)"
     OVERLAY_DEVICE=/dev/$DEVNAME
     mknod_dev $OVERLAY_DEVICE $OVERLAY_NODE_TYPE
-    if [ ! -f "$BOOTFS_TRIGGER" ]; then
+    if [ "x$OVERLAY_TYPE" = "x" ]; then mount -o "$OVERLAY_OPTIONS" $OVERLAY_DEVICE $OVERLAYFS
+     else mount -t $OVERLAY_TYPE -o "$OVERLAY_OPTIONS" $OVERLAY_DEVICE $OVERLAYFS; fi
+    MOUNTED=$?
+    if [ ! -f "$BOOTFS_TRIGGER" ] && [ $MOUNTED -eq 0 ]; then
       printf "prepare_root: moving backup to overlay filesystem" > /dev/kmsg
-      if [ "x$OVERLAY_TYPE" = "x" ]; then
-        mount -o "$OVERLAY_OPTIONS" $OVERLAY_DEVICE $OVERLAYFS
-      else
-        mount -t $OVERLAY_TYPE -o "$OVERLAY_OPTIONS" $OVERLAY_DEVICE $OVERLAYFS
+      rm -rf $OVERLAYFS
+      if [ -f "$BOOTFS_TARZ" ]; then
+        printf "prepare_root: found the sysupgrade backup file!" > /dev/kmsg
+        cp -ar $BOOTFS_TARZ $OVERLAYFS
       fi
-      if [ $? -eq 0 ]; then
-        rm -rf $OVERLAYFS
-        if [ -f "$BOOTFS_TARZ" ]; then
-          printf "prepare_root: found the sysupgrade backup file!" > /dev/kmsg
-          cp -ar $BOOTFS_TARZ $OVERLAYFS
-        fi
-        rm -rf $BOOTFS
-        mkdir -p $ETC_CONFIG_BOOT $ETC_CONFIG_OVERLAY
-        cp -af ${ETC_CONFIG}/fstab $ETC_CONFIG_BOOT
-        uci -c $ETC_CONFIG_BOOT set fstab.@mount[0].device="$OVERLAY_DEVICE"
-        uci -c $ETC_CONFIG_BOOT set fstab.@mount[0].enabled_fsck='1'
-        uci -c $ETC_CONFIG_BOOT set fstab.@mount[0].options="$OVERLAY_OPTIONS"
-        uci -c $ETC_CONFIG_BOOT set fstab.@mount[1].device="$BOOTFS_DEVICE"
-        uci -c $ETC_CONFIG_BOOT set fstab.@mount[1].enabled_fsck='1'
-        uci -c $ETC_CONFIG_BOOT set fstab.@mount[1].options="$BOOTFS_OPTIONS"
-        uci -c $ETC_CONFIG_BOOT commit
-        cp -af ${ETC_CONFIG_BOOT}/fstab ${ETC_CONFIG_OVERLAY}/fstab
-      fi
+      rm -rf $BOOTFS
+      mkdir -p $ETC_CONFIG_BOOT $ETC_CONFIG_OVERLAY
+      cp -af ${ETC_CONFIG}/fstab $ETC_CONFIG_BOOT
+      uci -c $ETC_CONFIG_BOOT set fstab.@mount[0].device="$OVERLAY_DEVICE"
+      uci -c $ETC_CONFIG_BOOT set fstab.@mount[0].options="$OVERLAY_OPTIONS"
+      uci -c $ETC_CONFIG_BOOT set fstab.@mount[1].device="$BOOTFS_DEVICE"
+      uci -c $ETC_CONFIG_BOOT set fstab.@mount[1].options="$BOOTFS_OPTIONS"
+      uci -c $ETC_CONFIG_BOOT commit
+      cp -af ${ETC_CONFIG_BOOT}/fstab ${ETC_CONFIG_OVERLAY}/fstab
       touch $BOOTFS_TRIGGER
     fi
+    [ $MOUNTED -eq 0 ] && cp -af ${ETC_CONFIG_OVERLAY}/fstab ${ETC_CONFIG_BOOT}/fstab
   fi
   umount $BOOTFS
   umount $OVERLAYFS
@@ -96,6 +91,7 @@ prepare_root_ntb() {
   if [ $? -eq 0 ]; then
     printf "prepare_root: successfully mounted pstore" > /dev/kmsg
   fi
+}; _prepare_root_ntb &>/dev/null;
 }
 
 boot_hook_add preinit_main prepare_root_ntb
