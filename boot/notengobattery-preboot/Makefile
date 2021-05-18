@@ -20,7 +20,9 @@ include $(INCLUDE_DIR)/package.mk
 define Package/notengobattery-preboot
 	SECTION:=base
 	CATEGORY:=Base system
-	DEPENDS:=+base-files
+	DEPENDS:= \
+	+base-files \
+	+block-mount
 	TITLE:=Customized preboot files for OpenWrt
 	MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 	URL:=https://notengobattery.com/

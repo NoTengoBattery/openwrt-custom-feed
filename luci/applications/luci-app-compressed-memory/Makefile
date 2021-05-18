@@ -12,10 +12,13 @@ PKG_RELEASE:=1
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
 LUCI_TITLE:=LuCI compressed memory  configuration
-LUCI_DESCRIPTION:=\
+LUCI_DESCRIPTION:= \
 This package allows users to configure the compressed memory subsystem.
 
-LUCI_DEPENDS:=+luci-base +swap-zram +swap-zswap
+LUCI_DEPENDS:= \
+	+luci-base \
+	+swap-zram \
+	+swap-zswap
 LUCI_PKGARCH:=all
 
 include $(TOPDIR)/feeds/luci/luci.mk
