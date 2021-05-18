@@ -7,7 +7,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=compressed-memory
-PKG_VERSION:=1.0.2
+PKG_VERSION:=1.0.3
 PKG_RELEASE:=1
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
@@ -20,16 +20,16 @@ define Package/compressed-memory
 	SECTION:=utils
 	CATEGORY:=Base system
 	DEPENDS:= \
+	+@BUSYBOX_CONFIG_FEATURE_SWAPON_DISCARD \
+	+@BUSYBOX_CONFIG_FEATURE_SWAPON_PRI \
+	+@BUSYBOX_CONFIG_MKSWAP \
+	+@BUSYBOX_CONFIG_SWAPOFF \
+	+@BUSYBOX_CONFIG_SWAPON \
 	+kmod-crypto-deflate \
 	+kmod-crypto-zstd \
 	+kmod-lib-lz4 \
 	+kmod-lib-lz4hc \
-	+kmod-lib-lzo \
-	+@BUSYBOX_CONFIG_MKSWAP \
-	+@BUSYBOX_CONFIG_SWAPON \
-	+@BUSYBOX_CONFIG_FEATURE_SWAPON_DISCARD \
-	+@BUSYBOX_CONFIG_FEATURE_SWAPON_PRI \
-	+@BUSYBOX_CONFIG_SWAPOFF
+	+kmod-lib-lzo
 	HIDDEN:=1
 	TITLE:=Configuration files for compressed-memory
 	MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
@@ -47,7 +47,8 @@ endef
 define Package/swap-zram
 	SECTION:=utils
 	CATEGORY:=Base system
-	DEPENDS:= +compressed-memory \
+	DEPENDS:= \
+	+compressed-memory \
 	+kmod-loop \
 	+kmod-zram-writeback \
 	+losetup
@@ -68,7 +69,8 @@ endef
 define Package/swap-zswap
 	SECTION:=utils
 	CATEGORY:=Base system
-	DEPENDS:= +compressed-memory \
+	DEPENDS:= \
+	+compressed-memory \
 	+kmod-zswap
 	TITLE:=Script to manage compressed LRU cache for swap
 	MAINTAINER:=Oever Gonzalez <software@notengobattery.com>

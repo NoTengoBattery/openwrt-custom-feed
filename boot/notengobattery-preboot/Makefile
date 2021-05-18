@@ -8,7 +8,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=notengobattery-preboot
 PKG_FLAGS:=nonshared
-PKG_VERSION:=1.0.2
+PKG_VERSION:=1.0.3
 PKG_RELEASE:=1
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
@@ -20,7 +20,9 @@ include $(INCLUDE_DIR)/package.mk
 define Package/notengobattery-preboot
 	SECTION:=base
 	CATEGORY:=Base system
-	DEPENDS:=+base-files
+	DEPENDS:= \
+	+base-files \
+	+block-mount
 	TITLE:=Customized preboot files for OpenWrt
 	MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 	URL:=https://notengobattery.com/
