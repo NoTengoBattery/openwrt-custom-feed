@@ -2,12 +2,13 @@
 # Copyright (C) 2019-2021 Oever González <software@notengobattery.com>
 #
 # Licensed to the public under the Apache License 2.0.
+# Problems? Sugestions? Visit: https://notengobattery.com
 #
 
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-compressed-memory
-PKG_VERSION:=1.0.3
+PKG_VERSION:=1.0.4
 PKG_RELEASE:=1
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 

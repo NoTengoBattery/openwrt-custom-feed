@@ -1,4 +1,7 @@
 #!/bin/bash
+#
+# Problems? Sugestions? Visit: https://notengobattery.com
+#
 
 [ "0$(uci -q get system.@system[0].notengobattery)" -eq 1 ] && exit 0
 
@@ -39,7 +42,7 @@ chsh root -s /bin/bash
 uci batch << EOI
   set system.@system[0].hostname=$DEVICE_HOSTNAME
   set system.@system[0].log_file='/dev/pmsg0'
-  set system.@system[0].log_size='1536'
+  set system.@system[0].log_size='2048'
   set system.@system[0].conloglevel='5'
   set system.@system[0].cronloglevel='9'
 

@@ -1,0 +1,30 @@
+#!/bin/sh
+#
+# Problems? Sugestions? Visit: https://notengobattery.com
+#
+
+. /lib/ntb/irq.sh
+
+disable_fw_log() {
+  local debug_level=/sys/kernel/debug/ieee80211/$1/ath10k/debug_level
+  printf "0x10000000" > $debug_level
+}
+
+configure_ct() {
+  local special=/sys/kernel/debug/ieee80211/$1/ath10k/ct_special
+  if [ -e $special ]; then
+    printf "0x100100000000" > $special  # Disable firmware kickout
+  fi
+}
+
+if [ "x$ACTION" = "xadd" ] && [ "x$DEVTYPE" = "xwlan" ]; then
+  DEVICE=$(readlink -f /sys/$DEVPATH)
+  DRIVER=$(basename $(readlink $DEVICE/device/driver))
+  if [ "x$DRIVER" = "xath10k_ahb" ]; then
+    NET=$INTERFACE
+    PHY=$(ls $DEVICE/device/ieee80211)
+    printf "ath10k_ahb: added a new wireless network interface: $NET [$PHY]" > /dev/kmsg
+    disable_fw_log $PHY
+    configure_ct $PHY
+  fi
+fi

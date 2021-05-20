@@ -1,0 +1,169 @@
+#!/bin/bash
+#
+# Problems? Sugestions? Visit: https://notengobattery.com
+#
+
+. /lib/functions.sh
+
+THIS="${0##*/}"
+FI=/tmp/factory.img
+board=$(board_name)
+
+usage() {
+  echo "Usage: $THIS <OEM image>"
+  echo
+  echo "This program can be used to revert back from OpenWrt to the OEM firmware."
+  echo
+  echo "  Oever González <software@notengobattery.com>"
+  exit 1
+}
+[ $# -lt 1 ] && usage
+
+if [ ! -f "$1" ]; then
+  echo "The image does not exist."
+  echo "$1: file not found."
+  exit 2
+fi
+
+echo "Copying the image to the temporary file system..."
+cp "$1" "$FI"
+
+case "$board" in
+linksys,ea6350v3)
+  DEVICE_STRING='.LINKSYS.01000409EA6350v3'
+  DEVICE_MULTI_PARTITION=yes
+  DEVICE_MTD1_PARTITION=kernel
+  DEVICE_MTD1_PARTITION_ID=1
+  DEVICE_MTD2_PARTITION=alt_kernel
+  DEVICE_MTD2_PARTITION_ID=2
+  DEVICE_USES_MTD_E=yes
+  FW_AUTORECOVERY=yes
+  declare -a IMAGE_STRING=(
+    "0D2592370       K0000000F02464EC"
+    "EE9735E90       K0000000F0246BEC"
+    "D2CED7340       K0000000F0246AAC"
+    "4994CAA00       K0000000F0246434"
+    "7DD324980       K0000000F0246A9C" )
+  declare -a IMAGE_VERSION=(
+    "3.1.4.175257"
+    "3.1.6.178912"
+    "3.1.9.180755"
+    "3.1.9.182357"
+    "3.1.10.191322" )
+  ;;
+*)
+  echo "Unsupported hardware '$board'."
+  rm "$FI"
+  exit 100
+  ;;
+esac
+
+# Verify the DEVICE_STRING
+if strings "$FI" | grep -q "$DEVICE_STRING"; then
+  echo "Found a valid device string."
+else
+  echo "$FI: Not a valid Linksys image."
+  rm "$FI"
+  exit 3
+fi
+
+KNOWN_VER=false
+# Check for a known version
+for ((i = 0; i < ${#IMAGE_STRING[@]}; ++i)); do
+  VVERSION=${IMAGE_VERSION[$i]}
+  SSTRING=${IMAGE_STRING[$i]}
+  echo "Checking for version $VVERSION"
+  if strings "$FI" | grep -q "$SSTRING"; then
+    echo "Found a image with a known version!"
+    echo "Linksys firmware version $VVERSION"
+    KNOWN_VER=true
+    VERSION_CRC=$(echo "$SSTRING" | awk '{print $1}')
+    break
+  fi
+done
+
+# Checksum
+if [ "x$KNOWN_VER" = "xtrue" ]; then
+  echo "Verifying the checksum..."
+  CUT_SIZE=$(($(stat -c '%s' "$FI") - 256))
+  FO=/tmp/fwcut
+  head -c "$CUT_SIZE" "$FI" > "$FO"
+  CRC_SUM=$(printf "%08X" $(cat "$FO" | cksum | awk '{print $1}')); rm "$FO"
+  if [ "x$VERSION_CRC" = "x$CRC_SUM""0" ]; then
+    echo "Checksum test passed, the image looks like a Linksys firmware."
+  else
+    echo "Invalid CRC for the firmware image. This image is corrupt."
+    rm "$FI"
+    exit 4
+  fi
+else
+  echo "This image is not a known image. If the image is valid, please send a sample to:"
+  echo "  Oever González <software@notengobattery.com>"
+  rm "$FI"
+  exit 5
+fi
+
+# Enable auto_recovery
+if [ "x$FW_AUTORECOVERY" = "xyes" ]; then
+  echo "To be safer, setting up auto_recovery to avoid hard bricking the device..."
+  AUTO_RECOVERY_ENA=$(fw_printenv -n auto_recovery)
+  if [ "x$AUTO_RECOVERY_ENA" != "xyes" ]; then
+    fw_setenv auto_recovery yes
+    AUTO_RECOVERY_ENA=$(fw_printenv -n auto_recovery)
+    if [ "x$AUTO_RECOVERY_ENA" = "xyes" ]; then
+      echo "'auto_recovery' was disabled. Now it is enabled."
+    else
+      echo "Something went wrong when configuring the bootloader. We cannot procceed!"
+      echo "This script may not work in failsafe mode!"
+      rm "$FI"
+      exit 8
+    fi
+  else
+    echo "Already enabled."
+  fi
+else
+  echo "Skipping enable auto_recovery: feature not available in this device"
+fi
+
+# Dual partition?
+if [ "x$DEVICE_MULTI_PARTITION" = "xyes" ]; then
+  if [ "x$DEVICE_USES_MTD_E" = "xyes" ]; then
+    CURRENT_BOOT=$(fw_printenv -n boot_part)
+    echo "Currently booted in partition $CURRENT_BOOT"
+    case "$CURRENT_BOOT" in
+    1)
+      MTD_PARTITION=$DEVICE_MTD2_PARTITION
+      ;;
+    2)
+      MTD_PARTITION=$DEVICE_MTD1_PARTITION
+      ;;
+    *)
+      echo "The device is not booted into a valid partition"
+      echo "This script may not work in failsafe mode!"
+      rm "$FI"
+      exit 6
+    esac
+    echo "Firmware to be writed to MTD partition '$MTD_PARTITION'"
+    echo "Writing the image. DO NOT TURN OFF THE DEVICE. This can take several minutes..."
+    mtd -e "$MTD_PARTITION" write "$FI" "$MTD_PARTITION" || exit 7
+    rm "$FI"
+    echo "Done writing the image."
+  fi
+fi
+
+if [ "x$DEVICE_MULTI_PARTITION" = "xyes" ]; then
+  echo "Commit changes to the bootloader..."
+  case "$CURRENT_BOOT" in
+  1)
+    fw_setenv boot_part $DEVICE_MTD2_PARTITION_ID
+    ;;
+  2)
+    fw_setenv boot_part $DEVICE_MTD1_PARTITION_ID
+    ;;
+  *)
+    echo "The device is not booted into a valid partition!"
+    exit 7
+  esac
+  echo "You will need to say yes to the 'firstboot' command..."
+  firstboot; echo "Correct. Reboot!"; sync; reboot
+fi

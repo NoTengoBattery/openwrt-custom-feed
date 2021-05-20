@@ -2,6 +2,7 @@
 // Copyright (C) 2019-2021 Oever González <software@notengobattery.com>
 //
 // Licensed to the public under the Apache License 2.0.
+// Problems? Sugestions? Visit: https://notengobattery.com
 //
 
 'use strict';
@@ -42,8 +43,8 @@ return L.view.extend({
 		return Promise.all([
 			callInitList('zram'),
 			callInitList('zswap'),
-			L.resolveDefault(fs.stat('/bin/zram'), null),
-			L.resolveDefault(fs.stat('/bin/zswap'), null),
+			L.resolveDefault(fs.stat('/usr/libexec/zram'), null),
+			L.resolveDefault(fs.stat('/usr/libexec/zswap'), null),
 			L.resolveDefault(fs.stat('/etc/config/compressed_memory'), null)
 		]);
 	},
