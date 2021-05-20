@@ -2,6 +2,7 @@
 # Copyright (C) 2019-2021 Oever González <software@notengobattery.com>
 #
 # Licensed to the public under the Apache License 2.0.
+# Problems? Sugestions? Visit: https://notengobattery.com
 #
 
 include $(TOPDIR)/rules.mk

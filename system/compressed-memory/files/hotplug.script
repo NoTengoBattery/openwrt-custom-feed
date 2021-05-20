@@ -1,3 +1,6 @@
+# Problems? Sugestions? Visit: https://notengobattery.com
+#
+
 . /lib/functions.sh
 
 # Put here any apps that may cause OOM or need intensive memory usage when
@@ -9,6 +12,6 @@ config_get adb_trigger global adb_trigger wan
 
 if [ "x$ACTION" = "xifup" ] || [ "x$ACTION" = "xifupdate" ]; then
   if [ "x$adb_enabled" = "x1" ] && [ "x$INTERFACE" = "x$adb_trigger" ]; then
-    /bin/zram initial_compact
+    /usr/libexec/zram initial_compact
   fi
 fi

@@ -3,6 +3,8 @@
 # Copyright (C) 2019-2021 Oever González <software@notengobattery.com>
 #
 # Licensed to the public under the Apache License 2.0.
+# Problems? Sugestions? Visit: https://notengobattery.com
+#
 
 readonly KIB=1024
 readonly MIB=1048576
@@ -46,7 +48,7 @@ ram_getsize() {
 }
 
 check_zswap() {
-	if [ -x '/bin/zswap' ] && /etc/init.d/zswap enabled; then
+	if [ -x '/usr/libexec/zswap' ] && /etc/init.d/zswap enabled; then
 		if [ "x$ZSWAP_OK" = "xno" ]; then return 200; fi
 		config_get_bool ZSWAP_ENABLED zswap enabled '0'; export ZSWAP_ENABLED
 		if [ "x$ZSWAP_ENABLED" = "x1" ]; then
@@ -236,8 +238,8 @@ start() {
 	/sbin/swapon -d -p 1000 $zram_dev && \
 		{ log_msg "activated '$zram_dev' for swapping ($rsize MiB)"; } || \
 		{ log_msg "error: cannot enable swap inside the device '$zram_dev'"; exit 6; }
-	add_or_update "zram compact" "0 */2 * * * /bin/zram compact" "/etc/crontabs/root"
-	/bin/zram initial_compact &
+	add_or_update "zram compact" "0 */2 * * * /usr/libexec/zram compact" "/etc/crontabs/root"
+	/usr/libexec/zram initial_compact &
 }
 
 zram_backing_remove() {

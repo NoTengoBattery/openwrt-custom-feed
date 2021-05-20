@@ -2,6 +2,7 @@
 # Copyright (C) 2019-2021 Oever González <software@notengobattery.com>
 #
 # Licensed to the public under the Apache License 2.0.
+# Problems? Sugestions? Visit: https://notengobattery.com
 #
 
 include $(TOPDIR)/rules.mk
@@ -103,19 +104,19 @@ endef
 
 define Package/swap-zram/install
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface
-	$(INSTALL_BIN) ./files/hotplug.script $(1)/etc/hotplug.d/iface/99-zram
+	$(INSTALL_DATA) ./files/hotplug.script $(1)/etc/hotplug.d/iface/99-zram
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/zram.init $(1)/etc/init.d/zram
-	$(INSTALL_DIR) $(1)/bin
-	$(INSTALL_BIN) ./files/zram.script $(1)/bin/zram
+	$(INSTALL_DIR) $(1)/usr/libexec
+	$(INSTALL_BIN) ./files/zram.script $(1)/usr/libexec/zram
 endef
 
 
 define Package/swap-zswap/install
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/zswap.init $(1)/etc/init.d/zswap
-	$(INSTALL_DIR) $(1)/bin
-	$(INSTALL_BIN) ./files/zswap.script $(1)/bin/zswap
+	$(INSTALL_DIR) $(1)/usr/libexec
+	$(INSTALL_BIN) ./files/zswap.script $(1)/usr/libexec/zswap
 endef
 
 

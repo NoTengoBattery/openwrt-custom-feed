@@ -3,6 +3,8 @@
 # Copyright (C) 2019-2021 Oever González <software@notengobattery.com>
 #
 # Licensed to the public under the Apache License 2.0.
+# Problems? Sugestions? Visit: https://notengobattery.com
+#
 
 readonly KIB=1024
 readonly MIB=1048576
@@ -53,7 +55,7 @@ _zswap_pool() {
 }
 
 check_zram() {
-  if [ -x '/bin/zram' ] && /etc/init.d/zram enabled; then
+  if [ -x '/usr/libexec/zram' ] && /etc/init.d/zram enabled; then
   config_get_bool ZRAM_ENABLED zram enabled '0'; export ZSWAP_ENABLED
   if [ "x$ZRAM_ENABLED" = "x1" ]; then return 0
   else return 1; fi
@@ -65,7 +67,7 @@ _launch_zram() {
   if check_zram; then /etc/init.d/zram stop
     if [ "x$success" = "xyes" ]; then
       log_msg "trying to enable zram on success..."
-      env - RUNNABLE=yes ZSWAP_OK=yes /bin/zram restart && \
+      env - RUNNABLE=yes ZSWAP_OK=yes /usr/libexec/zram restart && \
       { printf "$(_zswap_pool)" > $ZSWAP_SYSFS/max_pool_percent
         pool=$(cat $ZSWAP_SYSFS/max_pool_percent)
         ram_size=$(ram_getsize); pool_b=$(_do_math 0 "$pool * $ram_size * 10")

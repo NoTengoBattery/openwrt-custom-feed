@@ -1,0 +1,196 @@
+#!/bin/bash
+#
+# Problems? Sugestions? Visit: https://notengobattery.com
+#
+
+source /lib/functions.sh
+
+readonly ALT_WIFI0=hw_1/2G/DK04_2G_neg_pwr
+readonly ALT_WIFI1=hw_1/5G/DK04_5G
+readonly CALS_EXT=".bin"
+readonly CALS_PATH=/etc/calibration
+readonly CALS_ROOT="EA6350v3"
+readonly CALS_WIFI0=2G
+readonly CALS_WIFI1=5G
+readonly CURRENT_DIR=/lib/firmware/ath10k/QCA4019/hw1.0
+readonly CURRENT_FILE="$CURRENT_DIR/board-2.bin"
+readonly DEFAULT_WIFI0=AU/2G/Y9803_wifi0
+readonly DEFAULT_WIFI1=hw_1/5G/DK04_5G_neg_pwr
+readonly ENV_ROOT="$CALS_PATH/$CALS_ROOT"
+
+THIS=${0##*/}
+
+transform_name() {
+  while read data; do
+    local readonly UNPREFIXED="${data#"$ENV_ROOT/"}"
+    local readonly UNSUFIXED="${UNPREFIXED%"$CALS_EXT"}"
+    printf '  -- %s\n' "$UNSUFIXED"
+  done
+}
+
+usage() {
+  printf "%s: %s\n" "Overview" "Calibration script testing facility"
+  printf "%s: %s\n" "Usage" "$THIS <wifi0> <wifi1>"
+  printf "%s: %s\n\n" "Epilog" \
+"Generate a calibration board file and replace the current in use with it."
+  printf " %s\n" "Available calibrations for <wifi0>:"
+  find "$ENV_ROOT" -path '*/'"$CALS_WIFI0"'/*' -name '*'"$CALS_EXT"'' | \
+    sort | uniq | transform_name
+  printf " %s\n" "Available calibrations for <wifi1>:"
+  find "$ENV_ROOT" -path '*/'"$CALS_WIFI1"'/*' -name '*'"$CALS_EXT"'' | \
+    sort | uniq | transform_name
+  printf "\n%s\n%s\n" \
+"Use the special value 'default' for either argument (or both) to regenerate the" \
+"default, which is the best, calibration and restore it."
+  printf "%s\n%s\n\n" \
+"Use the special value 'alternative' for either argument (or both) to generate a" \
+"calibration with the best alternative calibration."
+  printf " %s\n\n" "Oever González <software@notengobattery.com>"
+  exit 0
+}
+
+[ $# -lt 2 ] && usage
+board=$(board_name)
+
+printe() {
+  printf "ERROR: %s\n" "$@" 1>&2
+}
+
+WIFI0="$1"
+WIFI1="$2"
+if [ "x$WIFI0" = "xdefault" ]; then WIFI0="$DEFAULT_WIFI0"; fi
+if [ "x$WIFI1" = "xdefault" ]; then WIFI1="$DEFAULT_WIFI1"; fi
+if [ "x$WIFI0" = "xalternative" ]; then WIFI0="$ALT_WIFI0"; fi
+if [ "x$WIFI1" = "xalternative" ]; then WIFI1="$ALT_WIFI1"; fi
+WIFI0="$ENV_ROOT/$WIFI0$CALS_EXT"
+WIFI1="$ENV_ROOT/$WIFI1$CALS_EXT"
+
+print_error1() {
+  local readonly file="$1"
+  printe "No calibration board file is present on firmware."
+  printe "$file: file not found."
+  exit 1
+}
+
+if [ ! -f "$CURRENT_FILE" ]; then print_error1 "$CURRENT_FILE"; fi
+
+print_error2() {
+  local readonly wifi="$1"
+  local readonly file="$2"
+  printe "Requested calibration for '$wifi' not found."
+  printe "$wifi: $file: no such directory."
+  exit 2
+}
+
+if [ ! -f "$WIFI0" ]; then print_error2 wifi0 "$WIFI0"; fi
+if [ ! -f "$WIFI1" ]; then print_error2 wifi1 "$WIFI1"; fi
+
+print_error3() {
+  local readonly hardware="$1"
+  printe "Unsupported hardware '$board'."
+  exit 3
+}
+
+case "$board" in
+ linksys,ea6350v3)
+  readonly ATH_BUS="ahb"
+  readonly ATH_CHIP="0"
+  readonly ATH_BOARD0="16"
+  readonly ATH_BOARD1="17"
+  readonly ATH_VARIANT="linksys-ea6350v3"
+  readonly ATH_WC="12064"
+  readonly ATH_BOARD_WC="24324"
+  ;;
+ *)
+  print_error3 "$board"
+  ;;
+esac
+
+readonly GENERATED=/tmp/ath10k_board.bin
+readonly WIFI0_WC=$(wc -c "$WIFI0" | awk '{print $1}')
+readonly WIFI1_WC=$(wc -c "$WIFI1" | awk '{print $1}')
+
+print_error4() {
+  local readonly wifi="$1"
+  local readonly file="$2"
+  printe "Requested calibration for '$wifi' looks invalid."
+  printe "$wifi: $file: file size mismatch."
+  exit 4
+}
+
+if [ "$WIFI0_WC" -ne "$ATH_WC" ]; then print_error4 wifi0 "$WIFI0"; fi
+if [ "$WIFI1_WC" -ne "$ATH_WC" ]; then print_error4 wifi1 "$WIFI1"; fi
+
+printal() {
+  local readonly align="$1"
+  local readonly fill="$2"
+  local readonly string="$3"
+  local readonly ending="$4"
+  gawk -v ALIGN="$align" -v ENDING="$ending" -v FILL="$fill" -v STRING="$string" \
+  'BEGIN {
+    STRLEN=length(STRING) + length(ENDING)
+    TO_INS=(ALIGN - STRLEN % ALIGN) % ALIGN
+    printf "%s%c", STRING, ENDING
+    for (c = 0; c < TO_INS; c++) {
+      printf "%c", FILL
+    }
+  }'
+}
+
+print_board_header() {
+  local readonly bus="$1"
+  local readonly chip="$2"
+  local readonly board="$3"
+  local readonly variant="$4"
+  printal 4 '\0' '\0' '\0'
+  printal 4 '\0' '\x70\x2f' '\0'
+  printal 4 '\0' '\0' '\0'
+  printal 4 '\0' '\x3e' '\0'
+  printal 4 '\x6d' "bus=$bus,bmi-chip-id=$chip,bmi-board-id=$board,variant=$variant" '\x6d'
+  printal 4 '\0' '\x1' '\0'
+  printal 4 '\0' '\x20\x2f' '\0'
+}
+
+generate_board() {
+  local readonly wifi0="$1"
+  local readonly wifi1="$2"
+  local readonly output="$3"
+  printal 4 '\x6d' 'QCA-ATH10K-BOARD' '\0' > "$output"
+  print_board_header $ATH_BUS $ATH_CHIP $ATH_BOARD0 $ATH_VARIANT >> "$output"
+  cat $wifi0 >> "$output"
+  print_board_header $ATH_BUS $ATH_CHIP $ATH_BOARD1 $ATH_VARIANT >> "$output"
+  cat $wifi1 >> "$output"
+}
+
+generate_board "$WIFI0" "$WIFI1" "$GENERATED"
+readonly GENERATED_WC=$(wc -c "$GENERATED" | awk '{print $1}')
+
+print_error5() {
+  local readonly file=$1
+  printe "Generation of the board file failed."
+  printe "$file: file size mismatch."
+  exit 5
+}
+
+if [ "$GENERATED_WC" -ne "$ATH_BOARD_WC" ]; then print_error5 "$GENERATED"; fi
+
+cat "$GENERATED" > "$CURRENT_FILE"
+GENERATED_CHSUM=$(cksum "$GENERATED" | awk '{print $1}')
+CURRENT_CHSUM=$(cksum "$CURRENT_FILE" | awk '{print $1}')
+
+print_error6() {
+  local readonly file="$1"
+  printe "Failed to install the generated board file."
+  printe "$file: checksum test failed."
+  exit 6
+}
+
+if [ "$GENERATED_CHSUM" -ne "$CURRENT_CHSUM" ]; then
+  print_error6 "$CURRENT_FILE"
+fi
+
+printf "%s\n" \
+"Calibration board file successfully updated. The network will restart now."
+
+rmmod ath10k_pci; rmmod ath10k_core
+modprobe ath10k_pci; wifi
