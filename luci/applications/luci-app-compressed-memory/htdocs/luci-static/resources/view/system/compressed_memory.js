@@ -97,8 +97,8 @@ return L.view.extend({
 
 			o = s.option(form.Value, 'pool_limit', _('Absolute memory pool limit'),
 				_('For calculating the disk\'s size (which is different from the estimated size occupied by it when filled with data, in memory); <b>never</b> size the disk bigger than this hard limit.<br>This limit is a percentage of the total system memory.'));
-			o.datatype = 'and(ufloat,max(375.00))';
-			o.default = '125';
+			o.datatype = 'and(ufloat,max(450.00))';
+			o.default = '200';
 			o.depends('advanced', '1');
 			o.rmempty = false;
 		}
@@ -158,7 +158,7 @@ return L.view.extend({
 				o = s.option(form.Value, 'zswap_scale_pool', _('Scale factor'),
 					_('Tune the percentage that will use the zswap pool when zram is enabled. This factor represents the uncompressed data size as a percentage of the zram\'s pool maximum size.'));
 				o.datatype = 'and(ufloat,max(75.00))';
-				o.default = '12.50';
+				o.default = '15.00';
 				o.depends('advanced', '1');
 				o.rmempty = false;
 			}

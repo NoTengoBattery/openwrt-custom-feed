@@ -8,8 +8,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=compressed-memory
-PKG_VERSION:=1.0.4
-PKG_RELEASE:=2
+PKG_VERSION:=1.0.5
+PKG_RELEASE:=1
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
 PKG_BUILD_DIR := $(BUILD_DIR)/$(PKG_NAME)
@@ -26,6 +26,7 @@ define Package/compressed-memory
 	+@BUSYBOX_CONFIG_MKSWAP \
 	+@BUSYBOX_CONFIG_SWAPOFF \
 	+@BUSYBOX_CONFIG_SWAPON \
+	+gawk \
 	+kmod-crypto-deflate \
 	+kmod-crypto-zstd \
 	+kmod-lib-lz4 \
