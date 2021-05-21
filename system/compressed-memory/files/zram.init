@@ -29,7 +29,7 @@ stop_service() {
 }
 
 reload_service() {
-	echo "Explicitly restarting the '$NAME' service..."
+	printf "Explicitly restarting the '$NAME' service..."
 	stop; start
 }
 

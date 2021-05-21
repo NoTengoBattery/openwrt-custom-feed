@@ -17,7 +17,7 @@ if [ "x$ACTION" = "xstratum" ]; then
     for stored in $output_dir/*; do
       bzip2 -tq9 -z $stored &
       if [ $? -eq 0 ]; then
-        echo "pstore: collected an compressed $(basename $stored) from last boot" > /dev/kmsg
+        printf "pstore: collected an compressed $(basename $stored) from last boot" > /dev/kmsg
       fi
     done
   fi

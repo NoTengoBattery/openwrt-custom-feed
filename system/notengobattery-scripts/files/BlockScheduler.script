@@ -16,19 +16,19 @@ _on_add() {
       WAS=$(cat $SCHEDULER)
       if [ "0$IS_ROTATIONAL" -eq 1 ]; then
         ROT=rotational
-        (echo $ROTATIONAL_QUEUE > $SCHEDULER) &> /dev/null
+        (printf $ROTATIONAL_QUEUE > $SCHEDULER) &> /dev/null
       else
         ROT=non-rotational
-        (echo $NON_ROTATIONAL_QUEUE > $SCHEDULER) &> /dev/null
+        (printf $NON_ROTATIONAL_QUEUE > $SCHEDULER) &> /dev/null
       fi
       if [ "x$WAS" = "x$(cat $SCHEDULER)" ]; then
         if [ "x$(grep $DEFAULT_QUEUE $SCHEDULER)" != "x" ]; then
           ROT=single-queue
-          (echo $DEFAULT_QUEUE > $SCHEDULER) &> /dev/null
+          (printf $DEFAULT_QUEUE > $SCHEDULER) &> /dev/null
         fi
       fi
       if [ "x$WAS" != "x$(cat $SCHEDULER)" ]; then
-        printf "I/O scheduler: $ROT device '$DEVNAME' was '$WAS', now '$(cat $SCHEDULER)'" > /dev/kmsg
+        logger -s -t "io_sched" -p "user.info" "Scheduler for $ROT device '$DEVNAME' is '$(cat $SCHEDULER)'"
       fi
     fi
   fi

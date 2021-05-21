@@ -233,7 +233,8 @@ start() {
 	/sbin/swapon -d -p 1000 $zram_dev && \
 		{ log_msg "activated '$zram_dev' for swapping ($rsize MiB)"; } || \
 		{ log_msg "error: cannot enable swap inside the device '$zram_dev'"; exit 6; }
-	add_or_update "zram compact" "0 */2 * * * /usr/libexec/zram compact" "/etc/crontabs/root"
+	touch /etc/crontabs/root
+	add_or_update "zram compact" "0 */2 * * * /usr/libexec/zram compact" /etc/crontabs/root
 	/usr/libexec/zram initial_compact &
 }
 

@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=notengobattery-scripts
 PKG_VERSION:=1.0.5
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
 PKG_BUILD_DIR := $(BUILD_DIR)/$(PKG_NAME)
@@ -41,11 +41,11 @@ define Package/notengobattery-scripts/install
 	$(INSTALL_BIN) ./files/BackToStock.script $(1)/usr/bin/BackToStock
 	$(INSTALL_BIN) ./files/TestCalibration.script $(1)/usr/bin/TestCalibration
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/block
-	$(INSTALL_BIN) ./files/BlockScheduler.script $(1)/etc/hotplug.d/block/00-scheduler
+	$(INSTALL_DATA) ./files/BlockScheduler.script $(1)/etc/hotplug.d/block/00-scheduler
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/net
-	$(INSTALL_BIN) ./files/ath10k.script $(1)/etc/hotplug.d/net/99-ath10k
+	$(INSTALL_DATA) ./files/ath10k.script $(1)/etc/hotplug.d/net/99-ath10k
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/ntp
-	$(INSTALL_BIN) ./files/pstore.script $(1)/etc/hotplug.d/ntp/00-pstore
+	$(INSTALL_DATA) ./files/pstore.script $(1)/etc/hotplug.d/ntp/00-pstore
 endef
 
 

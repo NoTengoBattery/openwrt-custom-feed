@@ -10,7 +10,7 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=notengobattery-defaults
 PKG_FLAGS:=nonshared
 PKG_VERSION:=1.0.5
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
 PKG_BUILD_DIR := $(BUILD_DIR)/$(PKG_NAME)
@@ -55,17 +55,17 @@ define Package/notengobattery-defaults/install
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_DATA) ./files/notengobattery.defaults $(1)/etc/uci-defaults/99_notengobattery
 	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_DATA) ./files/unbound.uci $(1)/etc/config/unbound
-	$(INSTALL_DATA) ./files/irqbalance.uci $(1)/etc/config/irqbalance
+	$(INSTALL_CONF) ./files/unbound.uci $(1)/etc/config/unbound
+	$(INSTALL_CONF) ./files/irqbalance.uci $(1)/etc/config/irqbalance
 	$(INSTALL_DIR) $(1)/etc/unbound
-	$(INSTALL_DATA) ./files/unbound_srv.conf $(1)/etc/unbound/unbound_srv.conf
+	$(INSTALL_CONF) ./files/unbound_srv.conf $(1)/etc/unbound/unbound_srv.conf
 	$(INSTALL_DIR) $(1)/etc/samba
-	$(INSTALL_DATA) ./files/samba.conf $(1)/etc/samba/smb.conf.template
+	$(INSTALL_CONF) ./files/samba.conf $(1)/etc/samba/smb.conf.template
 	$(INSTALL_DIR) $(1)/etc/ssh
-	$(INSTALL_DATA) ./files/sshd.conf $(1)/etc/ssh/sshd_config
+	$(INSTALL_CONF) ./files/sshd.conf $(1)/etc/ssh/sshd_config
 	$(INSTALL_DIR) $(1)/root/.config/htop
-	$(INSTALL_DATA) ./files/htoprc.conf $(1)/root/.config/htop/htoprc
-	$(INSTALL_DATA) ./files/nanorc.conf $(1)/root/.nanorc
+	$(INSTALL_CONF) ./files/htoprc.conf $(1)/root/.config/htop/htoprc
+	$(INSTALL_CONF) ./files/nanorc.conf $(1)/root/.nanorc
 endef
 
 
