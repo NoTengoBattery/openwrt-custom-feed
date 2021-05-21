@@ -22,7 +22,7 @@ balance_irq() {
     }
     while true; do
       if [ "x" = "x$irq" ]; then read -r irq || break; fi
-      _cpu_iterator $irq $(echo "$cpu_mask" | grep -o '.')
+      _cpu_iterator $irq $(printf "$cpu_mask" | grep -o '.')
     done
   }
 
