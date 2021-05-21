@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=notengobattery-preboot
 PKG_FLAGS:=nonshared
 PKG_VERSION:=1.0.5
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
 PKG_BUILD_DIR := $(BUILD_DIR)/$(PKG_NAME)
@@ -41,7 +41,7 @@ define Package/notengobattery-preboot/install
 	$(INSTALL_DIR) $(1)/lib/preinit
 	$(INSTALL_DATA) ./files/preboot_mount.script $(1)/lib/preinit/03_preboot_mount.sh
 	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_DATA) ./files/fstab.uci $(1)/etc/config/fstab
+	$(INSTALL_CONF) ./files/fstab.uci $(1)/etc/config/fstab
 	$(INSTALL_DIR) $(1)/usr/libexec
 	$(INSTALL_BIN) ./files/early_boot.script $(1)/usr/libexec/early_boot
 	$(INSTALL_DIR) $(1)/etc/init.d
