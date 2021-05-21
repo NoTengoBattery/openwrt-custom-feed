@@ -27,8 +27,8 @@ define Package/notengobattery-defaults
 	+bash \
 	+haveged \
 	+htop \
-	+io-schedulers \
 	+ipset \
+	+kmod-io-schedulers \
 	+kmod-nft-offload \
 	+luci-app-unbound \
 	+luci-ssl \
