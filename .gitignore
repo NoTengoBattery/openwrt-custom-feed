@@ -48,6 +48,7 @@ Temporary Items
 
 ### VisualStudioCode ###
 .vscode/*
+.vscode-ctags
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
