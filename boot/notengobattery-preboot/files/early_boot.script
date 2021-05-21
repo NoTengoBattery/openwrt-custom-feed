@@ -9,7 +9,6 @@
 
 set_file() { printf "$1" > "$2"; }
 
-
 set_governor() {
   local CPUFREQ=/sys/devices/system/cpu/cpufreq
   local POLICY=$CPUFREQ/policy*
