@@ -26,6 +26,7 @@ define Package/compressed-memory
 	+@BUSYBOX_CONFIG_MKSWAP \
 	+@BUSYBOX_CONFIG_SWAPOFF \
 	+@BUSYBOX_CONFIG_SWAPON \
+	+gawk \
 	+kmod-crypto-deflate \
 	+kmod-crypto-zstd \
 	+kmod-lib-lz4 \

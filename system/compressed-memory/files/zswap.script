@@ -32,22 +32,21 @@ ram_getsize() {
 }
 
 _zswap_factor() {
-  local ratio_scale; config_get ratio_scale zswap compressor_factor '0.725'
+  local ratio_scale; config_get ratio_scale zswap compressor_factor '0.925'
   log_msg "compression ratio scale: $(printf '%.2f' $ratio_scale)"
   printf $ratio_scale
 }
 
 _zswap_pool() {
-  local pool; config_get pool zram pool_limit '125'
+  local pool; config_get pool zram pool_limit '200'
   log_msg "pool limit for zram: $pool%"
   local worst; config_get worst zram worst_ratio '1.040'
   log_msg "worst case compression ratio for zram: $worst"
   local max_pool=$(_do_math 6 "$worst * $pool")
-  log_msg "absolute maximum memory pool: $(printf '%.2f' "$max_pool")%"
   local zpool; config_get zpool zswap zpool 'z3fold'
   local ratio; config_get ratio $zpool expected_ratio '2.000'
   log_msg "expected compression ratio for $zpool: $ratio"
-  local scale; config_get scale zswap zswap_scale_pool '12.50'
+  local scale; config_get scale zswap zswap_scale_pool '15.00'
   log_msg "zswap scale for zram pool: $scale%"
   local zswap_pool=$(_do_math 0 "$max_pool * $scale / ($ratio * 100)")
   log_msg "adjusted zswap pool: $zswap_pool%"

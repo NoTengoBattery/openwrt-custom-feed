@@ -53,8 +53,8 @@ check_zswap() {
 		config_get_bool ZSWAP_ENABLED zswap enabled '0'; export ZSWAP_ENABLED
 		if [ "x$ZSWAP_ENABLED" = "x1" ]; then
 			config_get ALGORITHM zswap compressor_scale 'zstd'; export ALGORITHM
-			config_get ZSWAP_SCALE zswap compressor_factor '0.725'; export ZSWAP_SCALE
-			config_get ZSWAP_POOL zswap zswap_scale_pool '12.50'; export ZSWAP_POOL
+			config_get ZSWAP_SCALE zswap compressor_factor '0.925'; export ZSWAP_SCALE
+			config_get ZSWAP_POOL zswap zswap_scale_pool '15.00'; export ZSWAP_POOL
 			config_get ZSWAP_ZPOOL zswap zpool 'z3fold'; export ZSWAP_ZPOOL
 			config_get ZPOOL_RATIO $ZSWAP_ZPOOL expected_ratio '3.000'; export ZPOOL_RATIO
 			config_get DRIVER $ALGORITHM driver "$ALGORITHM"; export DRIVER
@@ -78,7 +78,7 @@ zram_getsize() {
 	local pool_base_b=$(_do_math 0 \
 	  "$ram_size * $zswap_scaled * $pool_base * 10")
 	log_msg "calculated memory pool: $pool_base_b bytes"
-	local pool_limit; config_get pool_limit zram pool_limit '125'
+	local pool_limit; config_get pool_limit zram pool_limit '200'
 	log_msg "memory pool limit for zram: $pool_limit%"
 	local worst_ratio; config_get worst_ratio zram worst_ratio '1.040'
 	log_msg "worst expected compression ratio: $worst_ratio"
@@ -208,7 +208,7 @@ zram_backing_add() {
 add_or_update() {
   local keep=${4:-1}
   if [[ ! -f "$3" ]]; then return 1; fi
-  local result="$(awk -vm="$1" -vr="$2" -vk="$keep" \
+  local result="$(gawk -vm="$1" -vr="$2" -vk="$keep" \
 	 '$0~m{if(!re){$0=r;re=(1&&k)}}{print $0}ENDFILE{if(!re&&k){print r}}' "$3")"
   echo "$result" > "$3" # prefer echo because of the NL at the EOF
 }
@@ -220,12 +220,7 @@ start() {
 	local ram_size=$(ram_getsize)
 	local zram_size=$(zram_getsize)
 	local zram_pte=$(_do_math 2 "$zram_size / ($ram_size * 10)")
-	log_msg "maximum pool size for zram: $zram_size bytes ($zram_pte%)"
-	local pool_limit; config_get pool_limit zram pool_limit '125'
-	local worst_ratio; config_get worst_ratio zram worst_ratio '1.040'
-	local zswap_pool=$(_do_math 0 "$pool_limit * $worst_ratio * $ZSWAP_POOL / ($ZPOOL_RATIO * 100)")
-	log_msg "info: total memory for compression (assuming worst case): $zram_pte% +  $(printf '%.2f' $zswap_pool)%"
-	log_msg "info: total memory for compression (assuming avg. case): $pool_limit% +  $(printf '%.2f' $zswap_pool)%"
+	log_msg "zram swap device size: $zram_size bytes ($zram_pte% of system RAM)"
 	zram_reset $zram_dev || exit $?
 	zram_algorithm $zram_dev || exit $?
 	zram_streams $zram_dev || exit $?

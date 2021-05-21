@@ -8,7 +8,7 @@ config params 'zram'
 	option pool_base	'50.00'
 	# Hard pool % which clamp the maximum size of the zram device
 	#   This value is scaled by the worst expected compression ratio
-	option pool_limit	'125'
+	option pool_limit	'200'
 	# The worst ratio that is expected by the worst compression algorithm
 	#   This value should never be less than 1.00
 	option worst_ratio	'1.040'
@@ -40,9 +40,9 @@ config params 'zswap'
 	# The target underestimate compression ratio for the above compressor
 	#   Needed because zswap will evict hard-to-compress pages to zram,
 	#   worsening it's expected ratio
-	option compressor_factor	'0.725'
+	option compressor_factor	'0.925'
 	# This will scale the zswap pool to a percentage of the zram pool
-	option zswap_scale_pool	'12.50'
+	option zswap_scale_pool	'15.00'
 
 # Define the compression algorithms:
 #  The expected ratio is what defines the capacity to save RAM, where higher
@@ -53,39 +53,33 @@ config params 'zswap'
 #   known as the "cost".
 
 config compress 'deflate'
-	# average of 605 samples
 	option driver	'deflate'
-	option expected_ratio	'3.750'
+	option expected_ratio	'4.460'
 	option streams_factor	'100.00'
 
 config compress 'zstd'
-	# average of 605 samples
 	option driver	'zstd'
-	option expected_ratio	'3.550'
+	option expected_ratio	'4.305'
 	option streams_factor	'91.15'
 
 config compress 'lz4hc'
-	# average of 605 samples
 	option driver	'lz4hc'
-	option expected_ratio	'2.860'
+	option expected_ratio	'3.540'
 	option streams_factor	'100.00'
 
 config compress 'lzo'
-	# average of 605 samples
 	option driver	'lzo'
-	option expected_ratio	'2.820'
+	option expected_ratio	'3.400'
 	option streams_factor	'39.05'
 
 config compress 'lzo_rle'
-	# average of 605 samples
 	option driver	'lzo-rle'
-	option expected_ratio	'2.773'
+	option expected_ratio	'3.330'
 	option streams_factor	'17.80'
 
 config compress 'lz4'
-	# average of 605 samples
 	option driver	'lz4'
-	option expected_ratio	'2.728'
+	option expected_ratio	'3.205'
 	option streams_factor	'52.40'
 
 # Define the zpools:
@@ -93,8 +87,8 @@ config compress 'lz4'
 
 config zpool 'zbud'
 	# zbud guarantees a 2.00 compression ratio
-	option expected_ratio	'2.000' # the zpool stores this pages in one
+	option expected_ratio	'2.000'
 
 config zpool 'z3fold'
 	# zbud guarantees a 3.00 compression ratio
-	option expected_ratio	'3.000' # the zpool stores this pages in one
+	option expected_ratio	'3.000'

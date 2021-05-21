@@ -22,6 +22,7 @@ define Package/notengobattery-scripts
 	CATEGORY:=Base system
 	DEPENDS:= \
 	+bash \
+	+blkid \
 	+bzip2
 	TITLE:=Customized script files for OpenWrt
 	MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
