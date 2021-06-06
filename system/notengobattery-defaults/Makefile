@@ -10,7 +10,7 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=notengobattery-defaults
 PKG_FLAGS:=nonshared
 PKG_VERSION:=1.0.5
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
 PKG_BUILD_DIR := $(BUILD_DIR)/$(PKG_NAME)
