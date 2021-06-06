@@ -35,6 +35,10 @@ define Package/notengobattery-defaults
 	+luci-theme-openwrt-2020 \
 	+openssh-sftp-server \
 	+shadow-chsh \
+	+shadow-groupadd \
+	+shadow-groupdel \
+	+shadow-useradd \
+	+shadow-userdel \
 	+shadow-utils \
 	+unbound-control-setup \
 	+usbutils
