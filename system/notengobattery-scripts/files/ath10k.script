@@ -27,4 +27,5 @@ if [ "x$ACTION" = "xadd" ] && [ "x$DEVTYPE" = "xwlan" ]; then
     disable_fw_log $PHY
     configure_ct $PHY
   fi
+  balance_irq
 fi
