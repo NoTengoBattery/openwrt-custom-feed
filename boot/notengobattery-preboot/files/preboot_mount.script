@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Problems? Sugestions? Visit: https://notengobattery.com
+# Problems? Sugestions? Visit: https://www.notengobattery.com
 #
 
 . /lib/functions.sh
@@ -52,41 +52,47 @@ _prepare_root_ntb() {
     OVERLAY_OPTIONS='relatime'
     OVERLAY_UEVENT=/sys/block/mmcblk0/mmcblk0p1/uevent
    ;;
+   *)
+    SKIP_MOUNT=true
+   ;;
   esac
 
-  eval "$(cat $BOOTFS_UEVENT)"
-  BOOTFS_DEVICE=/dev/$DEVNAME
-  mknod_dev $BOOTFS_DEVICE $BOOTFS_NODE_TYPE
-  mount -t $BOOTFS_TYPE -o "$BOOTFS_OPTIONS" $BOOTFS_DEVICE $BOOTFS
-  if [ $? -eq 0 ]; then
-    eval "$(cat $OVERLAY_UEVENT)"
-    OVERLAY_DEVICE=/dev/$DEVNAME
-    mknod_dev $OVERLAY_DEVICE $OVERLAY_NODE_TYPE
-    if [ "x$OVERLAY_TYPE" = "x" ]; then mount -o "$OVERLAY_OPTIONS" $OVERLAY_DEVICE $OVERLAYFS
-     else mount -t $OVERLAY_TYPE -o "$OVERLAY_OPTIONS" $OVERLAY_DEVICE $OVERLAYFS; fi
-    MOUNTED=$?
-    if [ ! -f "$BOOTFS_TRIGGER" ] && [ $MOUNTED -eq 0 ]; then
-      printf "prepare_root: moving backup to overlay filesystem" > /dev/kmsg
-      rm -rf $OVERLAYFS
-      if [ -f "$BOOTFS_TARZ" ]; then
-        printf "prepare_root: found the sysupgrade backup file!" > /dev/kmsg
-        cp -ar $BOOTFS_TARZ $OVERLAYFS
+  if [ -z $SKIP_MOUNT ]; then
+    eval "$(cat $BOOTFS_UEVENT)"
+    BOOTFS_DEVICE=/dev/$DEVNAME
+    mknod_dev $BOOTFS_DEVICE $BOOTFS_NODE_TYPE
+    mount -t $BOOTFS_TYPE -o "$BOOTFS_OPTIONS" $BOOTFS_DEVICE $BOOTFS
+    if [ $? -eq 0 ]; then
+      eval "$(cat $OVERLAY_UEVENT)"
+      OVERLAY_DEVICE=/dev/$DEVNAME
+      mknod_dev $OVERLAY_DEVICE $OVERLAY_NODE_TYPE
+      if [ "x$OVERLAY_TYPE" = "x" ]; then mount -o "$OVERLAY_OPTIONS" $OVERLAY_DEVICE $OVERLAYFS
+       else mount -t $OVERLAY_TYPE -o "$OVERLAY_OPTIONS" $OVERLAY_DEVICE $OVERLAYFS; fi
+      MOUNTED=$?
+      if [ ! -f "$BOOTFS_TRIGGER" ] && [ $MOUNTED -eq 0 ]; then
+        printf "prepare_root: moving backup to overlay filesystem" > /dev/kmsg
+        rm -rf $OVERLAYFS
+        if [ -f "$BOOTFS_TARZ" ]; then
+          printf "prepare_root: found the sysupgrade backup file!" > /dev/kmsg
+          cp -ar $BOOTFS_TARZ $OVERLAYFS
+        fi
+        rm -rf $BOOTFS
+        mkdir -p $ETC_CONFIG_BOOT $ETC_CONFIG_OVERLAY
+        cp -af ${ETC_CONFIG}/fstab $ETC_CONFIG_BOOT
+        uci -c $ETC_CONFIG_BOOT set fstab.@mount[0].device="$OVERLAY_DEVICE"
+        uci -c $ETC_CONFIG_BOOT set fstab.@mount[0].options="$OVERLAY_OPTIONS"
+        uci -c $ETC_CONFIG_BOOT set fstab.@mount[1].device="$BOOTFS_DEVICE"
+        uci -c $ETC_CONFIG_BOOT set fstab.@mount[1].options="$BOOTFS_OPTIONS"
+        uci -c $ETC_CONFIG_BOOT commit
+        cp -af ${ETC_CONFIG_BOOT}/fstab ${ETC_CONFIG_OVERLAY}/fstab
+        touch $BOOTFS_TRIGGER
       fi
-      rm -rf $BOOTFS
-      mkdir -p $ETC_CONFIG_BOOT $ETC_CONFIG_OVERLAY
-      cp -af ${ETC_CONFIG}/fstab $ETC_CONFIG_BOOT
-      uci -c $ETC_CONFIG_BOOT set fstab.@mount[0].device="$OVERLAY_DEVICE"
-      uci -c $ETC_CONFIG_BOOT set fstab.@mount[0].options="$OVERLAY_OPTIONS"
-      uci -c $ETC_CONFIG_BOOT set fstab.@mount[1].device="$BOOTFS_DEVICE"
-      uci -c $ETC_CONFIG_BOOT set fstab.@mount[1].options="$BOOTFS_OPTIONS"
-      uci -c $ETC_CONFIG_BOOT commit
-      cp -af ${ETC_CONFIG_BOOT}/fstab ${ETC_CONFIG_OVERLAY}/fstab
-      touch $BOOTFS_TRIGGER
+      [ $MOUNTED -eq 0 ] && cp -af ${ETC_CONFIG_OVERLAY}/fstab ${ETC_CONFIG_BOOT}/fstab
     fi
-    [ $MOUNTED -eq 0 ] && cp -af ${ETC_CONFIG_OVERLAY}/fstab ${ETC_CONFIG_BOOT}/fstab
+    umount $BOOTFS
+    umount $OVERLAYFS
   fi
-  umount $BOOTFS
-  umount $OVERLAYFS
+
   mount -t pstore pstore /sys/fs/pstore
   if [ $? -eq 0 ]; then
     printf "prepare_root: successfully mounted pstore" > /dev/kmsg

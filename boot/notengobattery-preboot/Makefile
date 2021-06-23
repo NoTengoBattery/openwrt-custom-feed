@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=notengobattery-preboot
 PKG_FLAGS:=nonshared
 PKG_VERSION:=1.0.5
-PKG_RELEASE:=5
+PKG_RELEASE:=6
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
 PKG_BUILD_DIR := $(BUILD_DIR)/$(PKG_NAME)
@@ -25,7 +25,7 @@ define Package/notengobattery-preboot
 	+block-mount
 	TITLE:=Customized preboot files for OpenWrt
 	MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
-	URL:=https://notengobattery.com/
+	URL:=https://www.notengobattery.com/
 	PKGARCH:=all
 endef
 
