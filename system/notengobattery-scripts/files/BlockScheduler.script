@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Problems? Sugestions? Visit: https://notengobattery.com
+# Problems? Sugestions? Visit: https://www.notengobattery.com
 #
 
 readonly DEFAULT_QUEUE=noop

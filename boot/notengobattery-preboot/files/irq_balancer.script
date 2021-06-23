@@ -1,6 +1,6 @@
 # Functions to balance IRQs across CPUs
 #
-# Problems? Sugestions? Visit: https://notengobattery.com
+# Problems? Sugestions? Visit: https://www.notengobattery.com
 #
 
 . /lib/functions.sh
@@ -27,6 +27,7 @@ balance_irq() {
   }
 
   case "$board" in
+  avm,fritzbox-4040|\
   ezviz,cs-w3-wd1200g-eup|\
   linksys,ea6350v3|\
   linksys,ea8300|\

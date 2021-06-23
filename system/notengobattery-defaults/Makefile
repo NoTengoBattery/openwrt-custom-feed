@@ -2,7 +2,7 @@
 # Copyright (C) 2019-2021 Oever González <software@notengobattery.com>
 #
 # Licensed to the public under the Apache License 2.0.
-# Problems? Sugestions? Visit: https://notengobattery.com
+# Problems? Sugestions? Visit: https://www.notengobattery.com
 #
 
 include $(TOPDIR)/rules.mk
@@ -10,7 +10,7 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=notengobattery-defaults
 PKG_FLAGS:=nonshared
 PKG_VERSION:=1.0.5
-PKG_RELEASE:=5
+PKG_RELEASE:=6
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
 PKG_BUILD_DIR := $(BUILD_DIR)/$(PKG_NAME)
@@ -44,7 +44,7 @@ define Package/notengobattery-defaults
 	+usbutils
 	TITLE:=Customized default files and settings for OpenWrt
 	MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
-	URL:=https://notengobattery.com/
+	URL:=https://www.notengobattery.com/
 	PKGARCH:=all
 endef
 
