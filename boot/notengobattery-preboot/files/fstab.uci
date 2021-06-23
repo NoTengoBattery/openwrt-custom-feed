@@ -1,6 +1,9 @@
 # This file will contain some mount points that may not be present in all
 # targets. They are harmless, you can delete them in LuCI or remove them from
 # the file if you don't want them.
+#
+# Problems? Sugestions? Visit: https://www.notengobattery.com
+#
 
 config global
 	option anon_swap	'0'
