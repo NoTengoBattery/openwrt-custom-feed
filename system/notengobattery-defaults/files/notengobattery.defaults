@@ -22,7 +22,8 @@ case "$board" in
   DEVICE_HOSTNAME=Civic
   ;;
  linksys,ea8300|\
- linksys,mr8300)
+ linksys,mr8300|\
+ linksys,mr9000)
   DEVICE_HOSTNAME=Dallas
   ;;
  zbtlink,zbt-wg3526-16m)
