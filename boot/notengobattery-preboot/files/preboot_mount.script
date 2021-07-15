@@ -30,7 +30,8 @@ _prepare_root_ntb() {
    ;;
    linksys,ea6350v3|\
    linksys,ea8300|\
-   linksys,mr8300)
+   linksys,mr8300|\
+  linksys,mr9000)
     BOOTFS_NODE_TYPE=c
     BOOTFS_OPTIONS='relatime,bulk_read,compr=zstd'
     BOOTFS_TYPE=ubifs
