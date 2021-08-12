@@ -32,7 +32,8 @@ balance_irq() {
   linksys,ea6350v3|\
   linksys,ea8300|\
   linksys,mr8300|\
-  linksys,mr9000)
+  linksys,mr9000|\
+  mikrotik,hap-ac2)
     _find_irq bam_dma     | _set_affinity 21
     _find_irq spi         | _set_affinity 3
     _find_irq serial      | _set_affinity 3
