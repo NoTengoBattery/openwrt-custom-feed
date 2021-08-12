@@ -26,6 +26,9 @@ case "$board" in
  linksys,mr9000)
   DEVICE_HOSTNAME=Dallas
   ;;
+ mikrotik,hap-ac2)
+  DEVICE_HOSTNAME=Actinium
+  ;;
  zbtlink,zbt-wg3526-16m)
   DEVICE_HOSTNAME=Glucose
   ;;

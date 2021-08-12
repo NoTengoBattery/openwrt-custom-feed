@@ -8,7 +8,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=compressed-memory
-PKG_VERSION:=1.0.6
+PKG_VERSION:=1.0.7
 PKG_RELEASE:=0
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
