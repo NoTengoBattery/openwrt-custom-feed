@@ -17,7 +17,7 @@ set_governor() {
     if [ ! -d $pol ]; then break; fi
 
     : ${MAXFREQ:=$(cat $pol/scaling_available_frequencies | awk '{print $NF}')}
-    : ${MINFREQ:=$(cat $pol/scaling_available_frequencies | awk '{print $1}')}
+    : ${MINFREQ:=$(cat $pol/scaling_available_frequencies | awk '{print $NF}')}
     : ${LATENCY:=$(cat $pol/cpuinfo_transition_latency)}
     LATENCY=$(expr '(' "$LATENCY" '*' 750 ')' '/' 1000)
     set_file "$GOVERNOR"  "$pol/scaling_governor"
@@ -30,7 +30,7 @@ set_governor() {
 boot() {
   case "$DEVICE_PRODUCT" in
    IPQ40xx)
-    MINFREQ=200000
+    #MINFREQ=200000
    ;;
   esac
 

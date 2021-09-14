@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=notengobattery-defaults
 PKG_FLAGS:=nonshared
-PKG_VERSION:=1.0.7
+PKG_VERSION:=1.0.8
 PKG_RELEASE:=0
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
@@ -28,17 +28,12 @@ define Package/notengobattery-defaults
 	+haveged \
 	+htop \
 	+ipset \
-	+kmod-io-schedulers \
 	+kmod-nft-offload \
 	+luci-app-unbound \
 	+luci-ssl \
 	+luci-theme-openwrt-2020 \
 	+openssh-sftp-server \
 	+shadow-chsh \
-	+shadow-groupadd \
-	+shadow-groupdel \
-	+shadow-useradd \
-	+shadow-userdel \
 	+shadow-utils \
 	+unbound-control-setup \
 	+usbutils
@@ -57,7 +52,7 @@ endef
 
 define Package/notengobattery-defaults/install
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
-	$(INSTALL_DATA) ./files/notengobattery.defaults $(1)/etc/uci-defaults/99_notengobattery
+	$(INSTALL_DATA) ./files/notengobattery.defaults $(1)/etc/uci-defaults/99_1notengobattery
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/unbound.uci $(1)/etc/config/unbound
 	$(INSTALL_CONF) ./files/irqbalance.uci $(1)/etc/config/irqbalance
