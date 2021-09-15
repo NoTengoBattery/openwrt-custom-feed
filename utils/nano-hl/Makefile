@@ -33,7 +33,7 @@ define Package/nano-hl
   CATEGORY:=Utilities
   TITLE:=An enhanced clone of the Pico text editor with syntax highlight
   URL:=https://www.nano-editor.org/
-  DEPENDS:=+libncurses +zlib
+  DEPENDS:=+libmagic +libncurses +zlib
 endef
 
 

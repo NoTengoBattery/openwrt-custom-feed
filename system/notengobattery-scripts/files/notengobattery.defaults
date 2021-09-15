@@ -3,7 +3,7 @@
 # Problems? Sugestions? Visit: https://www.notengobattery.com
 #
 
-[ "0$(uci -q get system.@system[0].notengobattery)" -eq 2 ] && exit 0
+[ "0$(uci -q get system.@system[0].notengobattery)" -eq 1 ] && exit 0
 
 . /lib/functions.sh
 board=$(board_name)
@@ -54,21 +54,13 @@ uci batch << EOI
   set system.@system[0].cronloglevel='9'
 
   set network.globals.packet_steering='1'
-  set network.wan.dns='127.0.0.1'
-  set network.wan.peerdns='0'
-  set network.wan6.dns='::1'
-  set network.wan6.ifname='@wan'
-  set network.wan6.peerdns='0'
 
   set firewall.@defaults[0].flow_offloading='1'
 
   set dropbear.@dropbear[0].Interface='lan'
-
-  add_list dhcp.@dnsmasq[0].server='127.0.0.1#10053'
-  add_list dhcp.@dnsmasq[0].server='::1#10053'
-  set dhcp.@dnsmasq[0].noresolv='1'
+  
   set dhcp.lan.leasetime='24h'
 
-  set system.@system[0].notengobattery=2
+  set system.@system[0].notengobattery=1
   commit
 EOI
