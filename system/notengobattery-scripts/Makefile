@@ -8,7 +8,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=notengobattery-scripts
-PKG_VERSION:=1.0.7
+PKG_VERSION:=1.0.8
 PKG_RELEASE:=0
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
@@ -23,7 +23,12 @@ define Package/notengobattery-scripts
 	DEPENDS:= \
 	+bash \
 	+blkid \
-	+bzip2
+	+bzip2 \
+	+kmod-io-schedulers \
+	+shadow-chsh \
+	+shadow-utils \
+	+swap-zram \
+	+swap-zswap
 	TITLE:=Customized script files for OpenWrt
 	MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 	URL:=https://www.notengobattery.com/
@@ -40,12 +45,18 @@ define Package/notengobattery-scripts/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) ./files/BackToStock.script $(1)/usr/bin/BackToStock
 	$(INSTALL_BIN) ./files/TestCalibration.script $(1)/usr/bin/TestCalibration
+	$(INSTALL_DIR) $(1)/etc/calibration
+	$(INSTALL_DATA) ./files/ExtractCalibration.sh $(1)/etc/calibration/extract_calibration.sh
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/block
 	$(INSTALL_DATA) ./files/BlockScheduler.script $(1)/etc/hotplug.d/block/00-scheduler
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/net
 	$(INSTALL_DATA) ./files/ath10k.script $(1)/etc/hotplug.d/net/99-ath10k
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/ntp
 	$(INSTALL_DATA) ./files/pstore.script $(1)/etc/hotplug.d/ntp/00-pstore
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_DATA) ./files/notengobattery.defaults $(1)/etc/uci-defaults/99_0notengobattery
+
+	$(CP) ./files/EA6350v3 $(1)/etc/calibration/EA6350v3
 endef
 
 
