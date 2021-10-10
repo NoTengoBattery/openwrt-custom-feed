@@ -9,6 +9,9 @@
 board=$(board_name)
 
 case "$board" in
+ asus,rt-ac58u)
+  DEVICE_HOSTNAME=Retweet
+  ;;
  avm,fritzbox-4040)
   DEVICE_HOSTNAME=Friki
   ;;
