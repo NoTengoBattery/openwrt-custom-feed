@@ -34,26 +34,26 @@ balance_irq() {
   linksys,mr8300|\
   linksys,mr9000|\
   mikrotik,hap-ac2)
-    _find_irq bam_dma     | _set_affinity 21
-    _find_irq spi         | _set_affinity 3
-    _find_irq serial      | _set_affinity 3
-    _find_irq ath10k_ahb  | _set_affinity 10
-    _find_irq edma_eth_tx | _set_affinity 023
-    _find_irq edma_eth_rx | _set_affinity 23
-    _find_irq keys        | _set_affinity 3
-    _find_irq usb         | _set_affinity 3
+    _find_irq bam_dma     | _set_affinity 12
+    _find_irq spi         | _set_affinity 1
+    _find_irq serial      | _set_affinity 1
+    _find_irq ath10k_ahb  | _set_affinity 12
+    _find_irq edma_eth_tx | _set_affinity 0123
+    _find_irq edma_eth_rx | _set_affinity 3210
+    _find_irq keys        | _set_affinity 1
+    _find_irq usb         | _set_affinity 1
     ;;
   glinet,gl-b1300|\
   glinet,gl-s1300)
-    _find_irq bam_dma     | _set_affinity 21
-    _find_irq spi         | _set_affinity 3
-    _find_irq serial      | _set_affinity 3
-    _find_irq ath10k_ahb  | _set_affinity 30
-    _find_irq edma_eth_tx | _set_affinity 1
-    _find_irq edma_eth_rx | _set_affinity 2
-    _find_irq keys        | _set_affinity 3
-    _find_irq usb         | _set_affinity 3
-    _find_irq mmc         | _set_affinity 2
+    _find_irq bam_dma     | _set_affinity 12
+    _find_irq spi         | _set_affinity 1
+    _find_irq serial      | _set_affinity 1
+    _find_irq ath10k_ahb  | _set_affinity 12
+    _find_irq edma_eth_tx | _set_affinity 0123
+    _find_irq edma_eth_rx | _set_affinity 3210
+    _find_irq keys        | _set_affinity 1
+    _find_irq usb         | _set_affinity 1
+    _find_irq mmc         | _set_affinity 1
     _find_irq sdhci       | _set_affinity 2
     ;;
   zbtlink,zbt-wg3526-16m|\
