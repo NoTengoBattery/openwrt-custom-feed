@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=notengobattery-defaults
 PKG_FLAGS:=nonshared
-PKG_VERSION:=1.0.8
+PKG_VERSION:=1.0.9
 PKG_RELEASE:=0
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
