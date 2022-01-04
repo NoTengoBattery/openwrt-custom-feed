@@ -24,6 +24,8 @@ define Package/notengobattery-scripts
 	+bash \
 	+blkid \
 	+bzip2 \
+	+coreutils-cksum \
+	+coreutils-stat \
 	+kmod-io-schedulers \
 	+shadow-chsh \
 	+shadow-utils \

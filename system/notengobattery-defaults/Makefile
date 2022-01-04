@@ -28,6 +28,7 @@ define Package/notengobattery-defaults
 	+haveged \
 	+htop \
 	+ipset \
+	+irqbalance \
 	+kmod-nft-offload \
 	+luci-app-unbound \
 	+luci-ssl \

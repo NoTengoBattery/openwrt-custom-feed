@@ -9,39 +9,39 @@
 board=$(board_name)
 
 case "$board" in
- asus,rt-ac58u)
+asus,rt-ac58u)
   DEVICE_HOSTNAME=Retweet
   ;;
- avm,fritzbox-4040)
+avm,fritzbox-4040)
   DEVICE_HOSTNAME=Friki
   ;;
- glinet,gl-b1300)
+glinet,gl-b1300)
   DEVICE_HOSTNAME=Convexa-B
   ;;
- glinet,gl-s1300)
+glinet,gl-s1300)
   DEVICE_HOSTNAME=Convexa-S
   ;;
- linksys,ea6350v3)
+linksys,ea6350v3)
   DEVICE_HOSTNAME=Civic
   ;;
- linksys,ea8300|\
- linksys,mr8300|\
- linksys,mr9000)
+linksys,ea8300 | \
+  linksys,mr8300 | \
+  linksys,mr9000)
   DEVICE_HOSTNAME=Dallas
   ;;
- mikrotik,hap-ac2)
+mikrotik,hap-ac2)
   DEVICE_HOSTNAME=Actinium
   ;;
- zbtlink,zbt-wg3526-16m)
+zbtlink,zbt-wg3526-16m)
   DEVICE_HOSTNAME=Glucose
   ;;
- zbtlink,zbt-wg3526-32m)
+zbtlink,zbt-wg3526-32m)
   DEVICE_HOSTNAME=Galactose
   ;;
- ezviz,cs-w3-wd1200g-eup)
+ezviz,cs-w3-wd1200g-eup)
   DEVICE_HOSTNAME=Vitzio
   ;;
- *)
+*)
   logger -s -t ntb_def -p user.err "Unsupported hardware '$board'."
   exit 0
   ;;
@@ -49,7 +49,7 @@ esac
 
 chsh root -s /bin/bash
 
-uci batch << EOI
+uci batch <<EOI
   set system.@system[0].hostname=$DEVICE_HOSTNAME
   set system.@system[0].log_file='/dev/pmsg0'
   set system.@system[0].log_size='2048'

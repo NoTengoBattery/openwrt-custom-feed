@@ -43,13 +43,13 @@ linksys,ea6350v3)
     "EE9735E90       K0000000F0246BEC"
     "D2CED7340       K0000000F0246AAC"
     "4994CAA00       K0000000F0246434"
-    "7DD324980       K0000000F0246A9C" )
+    "7DD324980       K0000000F0246A9C")
   declare -a IMAGE_VERSION=(
     "3.1.4.175257"
     "3.1.6.178912"
     "3.1.9.180755"
     "3.1.9.182357"
-    "3.1.10.191322" )
+    "3.1.10.191322")
   ;;
 *)
   echo "Unsupported hardware '$board'."
@@ -87,8 +87,9 @@ if [ "x$KNOWN_VER" = "xtrue" ]; then
   echo "Verifying the checksum..."
   CUT_SIZE=$(($(stat -c '%s' "$FI") - 256))
   FO=/tmp/fwcut
-  head -c "$CUT_SIZE" "$FI" > "$FO"
-  CRC_SUM=$(printf "%08X" $(cat "$FO" | cksum | awk '{print $1}')); rm "$FO"
+  head -c "$CUT_SIZE" "$FI" >"$FO"
+  CRC_SUM=$(printf "%08X" $(cat "$FO" | cksum | awk '{print $1}'))
+  rm "$FO"
   if [ "x$VERSION_CRC" = "x$CRC_SUM""0" ]; then
     echo "Checksum test passed, the image looks like a Linksys firmware."
   else
@@ -142,6 +143,7 @@ if [ "x$DEVICE_MULTI_PARTITION" = "xyes" ]; then
       echo "This script may not work in failsafe mode!"
       rm "$FI"
       exit 6
+      ;;
     esac
     echo "Firmware to be writed to MTD partition '$MTD_PARTITION'"
     echo "Writing the image. DO NOT TURN OFF THE DEVICE. This can take several minutes..."
@@ -163,7 +165,11 @@ if [ "x$DEVICE_MULTI_PARTITION" = "xyes" ]; then
   *)
     echo "The device is not booted into a valid partition!"
     exit 7
+    ;;
   esac
   echo "You will need to say yes to the 'firstboot' command..."
-  firstboot; echo "Correct. Reboot!"; sync; reboot
+  firstboot
+  echo "Correct. Reboot!"
+  sync
+  reboot
 fi

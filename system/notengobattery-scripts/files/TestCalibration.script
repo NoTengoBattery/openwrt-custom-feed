@@ -32,19 +32,19 @@ usage() {
   printf "%s: %s\n" "Overview" "Calibration script testing facility"
   printf "%s: %s\n" "Usage" "$THIS <wifi0> <wifi1>"
   printf "%s: %s\n\n" "Epilog" \
-"Generate a calibration board file and replace the current in use with it."
+    "Generate a calibration board file and replace the current in use with it."
   printf " %s\n" "Available calibrations for <wifi0>:"
-  find "$ENV_ROOT" -path '*/'"$CALS_WIFI0"'/*' -name '*'"$CALS_EXT"'' | \
+  find "$ENV_ROOT" -path '*/'"$CALS_WIFI0"'/*' -name '*'"$CALS_EXT"'' |
     sort | uniq | transform_name
   printf " %s\n" "Available calibrations for <wifi1>:"
-  find "$ENV_ROOT" -path '*/'"$CALS_WIFI1"'/*' -name '*'"$CALS_EXT"'' | \
+  find "$ENV_ROOT" -path '*/'"$CALS_WIFI1"'/*' -name '*'"$CALS_EXT"'' |
     sort | uniq | transform_name
   printf "\n%s\n%s\n" \
-"Use the special value 'default' for either argument (or both) to regenerate the" \
-"default, which is the best, calibration and restore it."
+    "Use the special value 'default' for either argument (or both) to regenerate the" \
+    "default, which is the best, calibration and restore it."
   printf "%s\n%s\n\n" \
-"Use the special value 'alternative' for either argument (or both) to generate a" \
-"calibration with the best alternative calibration."
+    "Use the special value 'alternative' for either argument (or both) to generate a" \
+    "calibration with the best alternative calibration."
   printf " %s\n\n" "Oever González <software@notengobattery.com>"
   exit 0
 }
@@ -92,7 +92,7 @@ print_error3() {
 }
 
 case "$board" in
- linksys,ea6350v3)
+linksys,ea6350v3)
   readonly ATH_BUS="ahb"
   readonly ATH_CHIP="0"
   readonly ATH_BOARD0="16"
@@ -101,7 +101,7 @@ case "$board" in
   readonly ATH_WC="12064"
   readonly ATH_BOARD_WC="24324"
   ;;
- *)
+*)
   print_error3 "$board"
   ;;
 esac
@@ -127,7 +127,7 @@ printal() {
   local readonly string="$3"
   local readonly ending="$4"
   gawk -v ALIGN="$align" -v ENDING="$ending" -v FILL="$fill" -v STRING="$string" \
-  'BEGIN {
+    'BEGIN {
     STRLEN=length(STRING) + length(ENDING)
     TO_INS=(ALIGN - STRLEN % ALIGN) % ALIGN
     printf "%s%c", STRING, ENDING
@@ -155,11 +155,11 @@ generate_board() {
   local readonly wifi0="$1"
   local readonly wifi1="$2"
   local readonly output="$3"
-  printal 4 '\x6d' 'QCA-ATH10K-BOARD' '\0' > "$output"
-  print_board_header $ATH_BUS $ATH_CHIP $ATH_BOARD0 $ATH_VARIANT >> "$output"
-  cat $wifi0 >> "$output"
-  print_board_header $ATH_BUS $ATH_CHIP $ATH_BOARD1 $ATH_VARIANT >> "$output"
-  cat $wifi1 >> "$output"
+  printal 4 '\x6d' 'QCA-ATH10K-BOARD' '\0' >"$output"
+  print_board_header $ATH_BUS $ATH_CHIP $ATH_BOARD0 $ATH_VARIANT >>"$output"
+  cat $wifi0 >>"$output"
+  print_board_header $ATH_BUS $ATH_CHIP $ATH_BOARD1 $ATH_VARIANT >>"$output"
+  cat $wifi1 >>"$output"
 }
 
 generate_board "$WIFI0" "$WIFI1" "$GENERATED"
@@ -174,7 +174,7 @@ print_error5() {
 
 if [ "$GENERATED_WC" -ne "$ATH_BOARD_WC" ]; then print_error5 "$GENERATED"; fi
 
-cat "$GENERATED" > "$CURRENT_FILE"
+cat "$GENERATED" >"$CURRENT_FILE"
 GENERATED_CHSUM=$(cksum "$GENERATED" | awk '{print $1}')
 CURRENT_CHSUM=$(cksum "$CURRENT_FILE" | awk '{print $1}')
 
@@ -190,7 +190,9 @@ if [ "$GENERATED_CHSUM" -ne "$CURRENT_CHSUM" ]; then
 fi
 
 printf "%s\n" \
-"Calibration board file successfully updated. The network will restart now."
+  "Calibration board file successfully updated. The network will restart now."
 
-rmmod ath10k_pci; rmmod ath10k_core
-modprobe ath10k_pci; wifi
+rmmod ath10k_pci
+rmmod ath10k_core
+modprobe ath10k_pci
+wifi

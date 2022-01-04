@@ -7,7 +7,7 @@
 . /lib/ntb/irq.sh
 . /etc/device_info
 
-set_file() { printf "$1" > "$2"; }
+set_file() { printf "$1" >"$2"; }
 
 set_governor() {
   local CPUFREQ=/sys/devices/system/cpu/cpufreq
@@ -20,18 +20,18 @@ set_governor() {
     : ${MINFREQ:=$(cat $pol/scaling_available_frequencies | awk '{print $NF}')}
     : ${LATENCY:=$(cat $pol/cpuinfo_transition_latency)}
     LATENCY=$(expr '(' "$LATENCY" '*' 750 ')' '/' 1000)
-    set_file "$GOVERNOR"  "$pol/scaling_governor"
-    set_file "$LATENCY"   "$CPUFREQ/$GOVERNOR/rate_limit_us"
-    set_file "$MAXFREQ"   "$pol/scaling_max_freq"
-    set_file "$MINFREQ"   "$pol/scaling_min_freq"
+    set_file "$GOVERNOR" "$pol/scaling_governor"
+    set_file "$LATENCY" "$CPUFREQ/$GOVERNOR/rate_limit_us"
+    set_file "$MAXFREQ" "$pol/scaling_max_freq"
+    set_file "$MINFREQ" "$pol/scaling_min_freq"
   done
 }
 
 boot() {
   case "$DEVICE_PRODUCT" in
-   IPQ40xx)
+  IPQ40xx)
     #MINFREQ=200000
-   ;;
+    ;;
   esac
 
   set_governor
