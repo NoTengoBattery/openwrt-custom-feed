@@ -11,13 +11,18 @@ balance_irq() {
   _set_affinity() {
     local cpu_mask=$1
     _cpu_iterator() {
-      local internal_irq=$1; shift
-      _print_irq(){
-        printf $(printf '%x' $((1 << $2))) > /proc/irq/$1/smp_affinity
+      local internal_irq=$1
+      shift
+      _print_irq() {
+        printf $(printf '%x' $((1 << $2))) >/proc/irq/$1/smp_affinity
         irq_name=$(awk -virq="$1" '$1~irq{print $9}' /proc/interrupts)
       }
-      _print_irq $internal_irq $1; shift
-      while read -r irq && [ "x" != "x$1" ]; do _print_irq $irq $1; shift; done
+      _print_irq $internal_irq $1
+      shift
+      while read -r irq && [ "x" != "x$1" ]; do
+        _print_irq $irq $1
+        shift
+      done
       export irq
     }
     while true; do
@@ -27,39 +32,39 @@ balance_irq() {
   }
 
   case "$board" in
-  avm,fritzbox-4040|\
-  ezviz,cs-w3-wd1200g-eup|\
-  linksys,ea6350v3|\
-  linksys,ea8300|\
-  linksys,mr8300|\
-  linksys,mr9000|\
-  mikrotik,hap-ac2)
-    _find_irq bam_dma     | _set_affinity 12
-    _find_irq spi         | _set_affinity 1
-    _find_irq serial      | _set_affinity 1
-    _find_irq ath10k_ahb  | _set_affinity 12
+  avm,fritzbox-4040 | \
+    ezviz,cs-w3-wd1200g-eup | \
+    linksys,ea6350v3 | \
+    linksys,ea8300 | \
+    linksys,mr8300 | \
+    linksys,mr9000 | \
+    mikrotik,hap-ac2)
+    _find_irq bam_dma | _set_affinity 12
+    _find_irq spi | _set_affinity 1
+    _find_irq serial | _set_affinity 1
+    _find_irq ath10k_ahb | _set_affinity 12
     _find_irq edma_eth_tx | _set_affinity 0123
     _find_irq edma_eth_rx | _set_affinity 3210
-    _find_irq keys        | _set_affinity 1
-    _find_irq usb         | _set_affinity 1
+    _find_irq keys | _set_affinity 1
+    _find_irq usb | _set_affinity 1
     ;;
-  glinet,gl-b1300|\
-  glinet,gl-s1300)
-    _find_irq bam_dma     | _set_affinity 12
-    _find_irq spi         | _set_affinity 1
-    _find_irq serial      | _set_affinity 1
-    _find_irq ath10k_ahb  | _set_affinity 12
+  glinet,gl-b1300 | \
+    glinet,gl-s1300)
+    _find_irq bam_dma | _set_affinity 12
+    _find_irq spi | _set_affinity 1
+    _find_irq serial | _set_affinity 1
+    _find_irq ath10k_ahb | _set_affinity 12
     _find_irq edma_eth_tx | _set_affinity 0123
     _find_irq edma_eth_rx | _set_affinity 3210
-    _find_irq keys        | _set_affinity 1
-    _find_irq usb         | _set_affinity 1
-    _find_irq mmc         | _set_affinity 1
-    _find_irq sdhci       | _set_affinity 2
+    _find_irq keys | _set_affinity 1
+    _find_irq usb | _set_affinity 1
+    _find_irq mmc | _set_affinity 1
+    _find_irq sdhci | _set_affinity 2
     ;;
-  zbtlink,zbt-wg3526-16m|\
-  zbtlink,zbt-wg3526-32m)
-    _find_irq usb         | _set_affinity 3
-    _find_irq sdhci       | _set_affinity 1
+  zbtlink,zbt-wg3526-16m | \
+    zbtlink,zbt-wg3526-32m)
+    _find_irq usb | _set_affinity 3
+    _find_irq sdhci | _set_affinity 1
     ;;
   esac
 }
