@@ -15,6 +15,9 @@ asus,rt-ac58u)
 avm,fritzbox-4040)
   DEVICE_HOSTNAME=Friki
   ;;
+ezviz,cs-w3-wd1200g-eup)
+  DEVICE_HOSTNAME=Vitzio
+  ;;
 glinet,gl-b1300)
   DEVICE_HOSTNAME=Convexa-B
   ;;
@@ -38,8 +41,8 @@ zbtlink,zbt-wg3526-16m)
 zbtlink,zbt-wg3526-32m)
   DEVICE_HOSTNAME=Galactose
   ;;
-ezviz,cs-w3-wd1200g-eup)
-  DEVICE_HOSTNAME=Vitzio
+zyxel,nbg6617)
+  DEVICE_HOSTNAME=Zixane
   ;;
 *)
   logger -s -t ntb_def -p user.err "Unsupported hardware '$board'."

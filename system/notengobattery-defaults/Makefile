@@ -28,7 +28,6 @@ define Package/notengobattery-defaults
 	+haveged \
 	+htop \
 	+ipset \
-	+irqbalance \
 	+kmod-nft-offload \
 	+luci-app-unbound \
 	+luci-ssl \
@@ -56,7 +55,6 @@ define Package/notengobattery-defaults/install
 	$(INSTALL_DATA) ./files/notengobattery.defaults $(1)/etc/uci-defaults/99_1notengobattery
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/unbound.uci $(1)/etc/config/unbound
-	$(INSTALL_CONF) ./files/irqbalance.uci $(1)/etc/config/irqbalance
 	$(INSTALL_DIR) $(1)/etc/unbound
 	$(INSTALL_CONF) ./files/unbound_srv.conf $(1)/etc/unbound/unbound_srv.conf
 	$(INSTALL_DIR) $(1)/etc/samba
