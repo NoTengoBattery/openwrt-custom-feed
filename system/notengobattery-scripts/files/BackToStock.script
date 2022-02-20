@@ -25,8 +25,34 @@ if [ ! -f "$1" ]; then
   exit 2
 fi
 
-echo "Copying the image to the temporary file system..."
-cp "$1" "$FI"
+# echo "Checking if image is already in /tmp and skip making extra copy to preserve /tmp memory"
+FI_ABS=$(readlink -fn $1)
+FI_DIR="${FI_ABS%/*}"
+
+if [ "x$FI_DIR" = "x/tmp" ]; then
+    echo "Firmware image already in /tmp - skipping copy to save memory"
+    # make a symlink instead to not break the rest of this script (like the rm below)
+    ln -s $FI_ABS $FI
+else
+    echo "Copying the image to the temporary file system..."
+    cp "$1" "$FI"
+fi
+
+echo "Checking memory - /tmp dir size"
+# rough calculating if there is enough space on /tmp to proceed, need about 2* the firmware filesize
+FREE_TMP=$(df -k /tmp/ | tail -1 | awk '{ print $4 }')
+FW_SIZE=$(stat -c '%s' ${FI_ABS})
+NEED_SIZE=$((${FW_SIZE}/1024))
+#echo "Need memory size ${NEED_SIZE}"
+
+echo "Free /tmp space ${FREE_TMP}k"
+echo "FW size ${NEED_SIZE}k"
+
+if (( ${NEED_SIZE} > ${FREE_TMP} )); then
+    echo "Not enough free disk in /tmp to safely proceed , need at least ${NEED_SIZE}k"
+else
+    echo "Enough /tmp free to calculate firmware CRC"
+fi
 
 case "$board" in
 linksys,ea6350v3)
@@ -51,6 +77,21 @@ linksys,ea6350v3)
     "3.1.9.182357"
     "3.1.10.191322")
   ;;
+linksys,ea8300)
+  DEVICE_STRING='.LINKSYS.01000407EA8300'
+  DEVICE_MULTI_PARTITION=yes
+  DEVICE_MTD1_PARTITION=kernel
+  DEVICE_MTD1_PARTITION_ID=1
+  DEVICE_MTD2_PARTITION=alt_kernel
+  DEVICE_MTD2_PARTITION_ID=2
+  DEVICE_USES_MTD_E=yes
+  FW_AUTORECOVERY=yes
+  # FW 1.1.5.201210 : Supports both EA8300 V1.1 and EA8300 V1.0
+  declare -a IMAGE_STRING=(
+    "E5EFF2600       K0000000F02771C4" )
+  declare -a IMAGE_VERSION=(
+    "1.1.5.201210")
+  ;;
 *)
   echo "Unsupported hardware '$board'."
   rm "$FI"
@@ -74,7 +115,7 @@ for ((i = 0; i < ${#IMAGE_STRING[@]}; ++i)); do
   SSTRING=${IMAGE_STRING[$i]}
   echo "Checking for version $VVERSION"
   if strings "$FI" | grep -q "$SSTRING"; then
-    echo "Found a image with a known version!"
+    echo "Found an image with a known version!"
     echo "Linksys firmware version $VVERSION"
     KNOWN_VER=true
     VERSION_CRC=$(echo "$SSTRING" | awk '{print $1}')
@@ -85,7 +126,8 @@ done
 # Checksum
 if [ "x$KNOWN_VER" = "xtrue" ]; then
   echo "Verifying the checksum..."
-  CUT_SIZE=$(($(stat -c '%s' "$FI") - 256))
+  # in case it's a symlink, need derefed stat to caculate correctly
+  CUT_SIZE=$(($(stat -Lc '%s' "$FI") - 256))
   FO=/tmp/fwcut
   head -c "$CUT_SIZE" "$FI" >"$FO"
   CRC_SUM=$(printf "%08X" $(cat "$FO" | cksum | awk '{print $1}'))
