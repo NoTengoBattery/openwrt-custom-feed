@@ -8,7 +8,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=notengobattery-scripts
-PKG_VERSION:=1.0.9
+PKG_VERSION:=1.0.a
 PKG_RELEASE:=0
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
