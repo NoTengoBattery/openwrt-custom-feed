@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=notengobattery-defaults
 PKG_FLAGS:=nonshared
-PKG_VERSION:=1.0.a
+PKG_VERSION:=1.0.b
 PKG_RELEASE:=0
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
@@ -36,7 +36,9 @@ define Package/notengobattery-defaults
 	+shadow-chsh \
 	+shadow-utils \
 	+unbound-control-setup \
-	+usbutils
+	+usb-modeswitch \
+	+usbutils \
+	+wget-ssl
 	TITLE:=Customized default files and settings for OpenWrt
 	MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 	URL:=https://www.notengobattery.com/
