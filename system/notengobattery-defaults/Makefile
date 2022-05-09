@@ -36,7 +36,9 @@ define Package/notengobattery-defaults
 	+shadow-chsh \
 	+shadow-utils \
 	+unbound-control-setup \
-	+usbutils
+	+usb-modeswitch \
+	+usbutils \
+	+wget-ssl
 	TITLE:=Customized default files and settings for OpenWrt
 	MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 	URL:=https://www.notengobattery.com/
