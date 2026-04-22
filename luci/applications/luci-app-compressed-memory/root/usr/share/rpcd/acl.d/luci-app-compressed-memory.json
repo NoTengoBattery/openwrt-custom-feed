@@ -2,9 +2,25 @@
 	"luci-app-compressed-memory": {
 		"description": "Grant UCI access for luci-app-compressed-memory",
 		"read": {
+			"ubus": {
+				"luci": [
+					"getInitList"
+				]
+			},
 			"uci": [
 				"compressed_memory"
-			]
+			],
+			"file": {
+				"/usr/libexec/zram": [
+					"stat"
+				],
+				"/usr/libexec/zswap": [
+					"stat"
+				],
+				"/etc/config/compressed_memory": [
+					"stat"
+				]
+			}
 		},
 		"write": {
 			"uci": [

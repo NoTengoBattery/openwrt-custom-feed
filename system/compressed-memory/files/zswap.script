@@ -1,14 +1,14 @@
 #!/bin/sh /etc/rc.common
 #
-# Copyright (C) 2019-2021 Oever González <software@notengobattery.com>
+# Copyright (C) 2019-2026 Oever González <software@notengobattery.com>
 #
 # Licensed to the public under the Apache License 2.0.
-# Problems? Sugestions? Visit: https://www.notengobattery.com
+# Problems? Suggestions? software@notengobattery.com
 #
 
-readonly KIB=1024
-readonly MIB=1048576
-readonly CONFIG=compressed_memory
+export LOG_TAG=zswap
+. /usr/libexec/zmemory.common
+
 readonly ZSWAP_SYSFS=/sys/module/zswap/parameters
 readonly ZSWAP_DEBUGFS=/sys/kernel/debug/zswap
 extra_command "status" "Show statistics for zswap"
@@ -16,214 +16,269 @@ extra_command "status" "Show statistics for zswap"
 config_load $CONFIG
 config_get_bool ZRAM_ENABLED zram enabled '0'
 
-log_msg() {
-  logger -s -t "zswap" -p "user.info" "$@"
-}
-
-_do_math() {
-  local decimals="$1"
-  local expression="$2"
-  awk 'END{ f = "%.'"$decimals"'f"; printf f, '"$expression"' }' /dev/null
-}
-
-ram_getsize() {
-  local kib=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
-  _do_math 3 "$kib * 1.024"
-}
-
-_zswap_factor() {
-  local ratio_scale
-  config_get ratio_scale zswap compressor_factor '0.925'
-  log_msg "compression ratio scale: $(printf '%.2f' $ratio_scale)"
-  printf $ratio_scale
-}
-
+# Calculate zswap pool size when zram is also enabled
 _zswap_pool() {
-  local pool
-  config_get pool zram pool_limit '200'
-  log_msg "pool limit for zram: $pool%"
-  local worst
-  config_get worst zram worst_ratio '1.040'
-  log_msg "worst case compression ratio for zram: $worst"
-  local max_pool=$(_do_math 6 "$worst * $pool")
-  local zpool
-  config_get zpool zswap zpool 'z3fold'
-  local ratio
-  config_get ratio $zpool expected_ratio '2.000'
-  log_msg "expected compression ratio for $zpool: $ratio"
-  local scale
-  config_get scale zswap zswap_scale_pool '15.00'
-  log_msg "zswap scale for zram pool: $scale%"
-  local zswap_pool=$(_do_math 0 "$max_pool * $scale / ($ratio * 100)")
-  log_msg "adjusted zswap pool: $zswap_pool%"
-  printf $zswap_pool
+	local pool_base
+	config_get pool_base zram pool_base '30.00'
+	local scale
+	config_get scale tuning zswap_scale_pool '50.00'
+	# zswap gets a percentage of the shared pool target
+	local zswap_pool=$(_do_math 0 "$pool_base * $scale / 100")
+	log_msg "Pool split: $scale% of $pool_base% target = $zswap_pool% for zswap"
+	printf $zswap_pool
 }
 
+# Check if zram is enabled
 check_zram() {
-  if [ -x '/usr/libexec/zram' ] && /etc/init.d/zram enabled; then
-    config_get_bool ZRAM_ENABLED zram enabled '0'
-    export ZSWAP_ENABLED
-    if [ "x$ZRAM_ENABLED" = "x1" ]; then
-      return 0
-    else return 1; fi
-  else return 2; fi
+	if [ -x '/usr/libexec/zram' ] && /etc/init.d/zram enabled; then
+		config_get_bool ZRAM_ENABLED zram enabled '0'
+		if [ "x$ZRAM_ENABLED" = "x1" ]; then
+			return 0
+		else return 1; fi
+	else return 2; fi
 }
 
+# Launch zram after zswap setup and apply VM tuning
 _launch_zram() {
-  local success=$1
-  if check_zram; then
-    /etc/init.d/zram stop
-    if [ "x$success" = "xyes" ]; then
-      log_msg "trying to enable zram on success..."
-      env - RUNNABLE=yes ZSWAP_OK=yes /usr/libexec/zram restart &&
-        {
-          printf "$(_zswap_pool)" >$ZSWAP_SYSFS/max_pool_percent
-          pool=$(cat $ZSWAP_SYSFS/max_pool_percent)
-          ram_size=$(ram_getsize)
-          pool_b=$(_do_math 0 "$pool * $ram_size * 10")
-          log_msg "maximum pool for zswap: $pool% ($pool_b bytes)"
-        }
-    else
-      log_msg "trying to enable zram on failure..."
-      env - RUNNABLE=yes ZSWAP_OK=no /etc/init.d/zram restart
-    fi
-  else
-    log_msg "info: zram is not enabled or not available"
-  fi
+	local success=$1
+	local swappiness
+	if check_zram; then
+		/etc/init.d/zram stop
+		if [ "x$success" = "xyes" ]; then
+			log_msg "Starting zram..."
+			env - RUNNABLE=yes ZSWAP_OK=yes /usr/libexec/zram restart &&
+				{
+					printf "$(_zswap_pool)" >$ZSWAP_SYSFS/max_pool_percent
+					pool=$(cat $ZSWAP_SYSFS/max_pool_percent)
+					ram_size=$(ram_getsize)
+					pool_mib=$(_do_math 2 "$ram_size * $pool / 100 / $MIB")
+					log_msg "Adjusted zswap pool to $pool% ($pool_mib MiB)"
+					# Apply combined swappiness after zram starts successfully
+					config_get swappiness tuning swappiness_combined '180'
+					apply_vm_tuning "$swappiness"
+				}
+		else
+			log_msg "Starting zram (zswap failed)..."
+			env - RUNNABLE=yes ZSWAP_OK=no /etc/init.d/zram restart &&
+				{
+					# Apply standalone swappiness when zswap failed
+					config_get swappiness zram swappiness '120'
+					apply_vm_tuning "$swappiness"
+				}
+		fi
+	else
+		log_msg "zram is not enabled"
+		# zswap alone - apply zswap standalone swappiness
+		config_get swappiness zswap swappiness '120'
+		apply_vm_tuning "$swappiness"
+	fi
 }
 
 zswap_available() {
-  if [ ! -d "$ZSWAP_SYSFS" ]; then
-    log_msg "error: zswap module is not loaded!"
-    return 1
-  fi
-  local enabled
-  config_get_bool enabled zswap enabled '0'
-  if [ "0$enabled" -eq "0" ] && [ "x$UCI_RUN" != "xyes" ]; then
-    log_msg "warning: zswap is not enabled in UCI"
-    return 100
-  fi
-  tools="awk block swapoff"
-  for tool in $tools; do
-    if which $tool &>/dev/null; then :; else
-      log_msg "error: command '$tool' not found"
-      return 2
-    fi
-  done
+	if [ ! -d "$ZSWAP_SYSFS" ]; then
+		log_msg "zswap kernel module is not loaded"
+		return 1
+	fi
+	local enabled
+	config_get_bool enabled zswap enabled '0'
+	if [ "0$enabled" -eq "0" ] && [ "x$UCI_RUN" != "xyes" ]; then
+		log_msg "zswap is disabled in configuration"
+		return 100
+	fi
+	local tools="awk swapoff"
+	for tool in $tools; do
+		if ! which $tool >/dev/null 2>&1; then
+			log_msg "Required tool '$tool' not found"
+			return 2
+		fi
+	done
 }
 
 start() {
-  zswap_available || exit $?
-  local zpool
-  config_get zpool zswap zpool 'z3fold'
-  printf "$zpool" >$ZSWAP_SYSFS/zpool
-  local zpool_is=$(cat $ZSWAP_SYSFS/zpool)
-  log_msg "zpool for zswap: '$zpool'"
-  if [ "x$zpool_is" != "x$zpool" ]; then
-    log_msg "unsupported zpool $zpool, using $zpool_is instead"
-    printf "$zpool_is" >$ZSWAP_SYSFS/zpool
-    uci set ${CONFIG}.zswap.zpool="$zpool_is"
-    uci commit
-    env - /etc/init.d/zswap restart
-    exit 200
-  fi
-  local algorithm
-  config_get algorithm zswap algorithm 'lzo_rle'
-  local driver
-  config_get driver $algorithm driver 'lzo-rle'
-  printf "$driver" >$ZSWAP_SYSFS/compressor
-  local driver_is=$(cat $ZSWAP_SYSFS/compressor)
-  log_msg "driver for zswap: '$driver_is'"
-  if [ "x$driver_is" != "x$driver" ]; then
-    printf "deflate" >$ZSWAP_SYSFS/compressor
-    driver_is=$(cat $ZSWAP_SYSFS/compressor)
-    log_msg "unsupported driver $driver, using $driver_is instead"
-    printf "$driver_is" >$ZSWAP_SYSFS/compressor
-    uci set ${CONFIG}.zswap.algorithm="$driver_is"
-    uci commit
-    env - /etc/init.d/zswap restart
-    exit 201
-  fi
-  local pool
-  config_get pool zswap pool '20.00'
-  printf '%.0f' "$pool" >$ZSWAP_SYSFS/max_pool_percent
-  pool=$(cat $ZSWAP_SYSFS/max_pool_percent)
-  local ram_size=$(ram_getsize)
-  local pool_b=$(_do_math 0 "$pool * $ram_size * 10")
-  log_msg "maximum pool for zswap: $pool% ($pool_b bytes)"
-  printf "Y" >$ZSWAP_SYSFS/enabled
-  local enabled=$(cat $ZSWAP_SYSFS/enabled)
-  if [ "x$enabled" = "xY" ]; then
-    log_msg "zswap was successfully enabled"
-  else
-    log_msg "error: could not enable the zswap pool"
-    _launch_zram no
-    exit 3
-  fi
-  local swapiness
-  config_get swapiness zswap swappiness '80'
-  sysctl -w vm.swappiness="$(printf '%.0f' "$swapiness")" >/dev/null
-  swapiness=$(sysctl vm.swappiness)
-  log_msg "system swapiness is $swapiness"
-  _launch_zram yes
+	zswap_available || exit $?
+
+	local zpool
+	config_get zpool zswap zpool 'zsmalloc'
+	printf "$zpool" >$ZSWAP_SYSFS/zpool
+	local zpool_is=$(cat $ZSWAP_SYSFS/zpool)
+	log_msg "Memory allocator set to $zpool"
+	if [ "x$zpool_is" != "x$zpool" ]; then
+		log_msg "Allocator $zpool not supported, falling back to $zpool_is"
+		uci set ${CONFIG}.zswap.zpool="$zpool_is"
+		uci commit
+		env - /etc/init.d/zswap restart
+		exit 200
+	fi
+
+	local algorithm
+	config_get algorithm zswap algorithm 'lz4'
+	local driver
+	config_get driver $algorithm driver 'lz4'
+	printf "$driver" >$ZSWAP_SYSFS/compressor
+	local driver_is=$(cat $ZSWAP_SYSFS/compressor)
+	log_msg "Compressor set to $driver_is"
+	if [ "x$driver_is" != "x$driver" ]; then
+		printf "deflate" >$ZSWAP_SYSFS/compressor
+		driver_is=$(cat $ZSWAP_SYSFS/compressor)
+		log_msg "Compressor $driver not supported, falling back to $driver_is"
+		uci set ${CONFIG}.zswap.algorithm="$driver_is"
+		uci commit
+		env - /etc/init.d/zswap restart
+		exit 201
+	fi
+
+	local pool
+	config_get pool zswap pool '20.00'
+	printf '%.0f' "$pool" >$ZSWAP_SYSFS/max_pool_percent
+	pool=$(cat $ZSWAP_SYSFS/max_pool_percent)
+	local ram_size=$(ram_getsize)
+	local pool_mib=$(_do_math 2 "$ram_size * $pool / 100 / $MIB")
+	log_msg "Pool size set to $pool% ($pool_mib MiB)"
+
+	# Set accept threshold (hysteresis to prevent thrashing when pool is near-full)
+	local accept_threshold
+	config_get accept_threshold zswap accept_threshold '90'
+	if [ -f "$ZSWAP_SYSFS/accept_threshold_percent" ]; then
+		printf "$accept_threshold" >$ZSWAP_SYSFS/accept_threshold_percent
+		log_msg "Accept threshold set to $accept_threshold%"
+	fi
+
+	# Configure shrinker (proactive cold page eviction from zswap to backing swap)
+	local shrinker
+	config_get_bool shrinker zswap shrinker '1'
+	if [ -f "$ZSWAP_SYSFS/shrinker_enabled" ]; then
+		if [ "0$shrinker" -eq 1 ]; then
+			printf "Y" >$ZSWAP_SYSFS/shrinker_enabled
+			log_msg "Shrinker enabled (proactive cold page eviction)"
+		else
+			printf "N" >$ZSWAP_SYSFS/shrinker_enabled
+			log_msg "Shrinker disabled"
+		fi
+	fi
+
+	printf "Y" >$ZSWAP_SYSFS/enabled
+	local enabled=$(cat $ZSWAP_SYSFS/enabled)
+	if [ "x$enabled" = "xY" ]; then
+		log_msg "zswap enabled successfully"
+	else
+		log_msg "Failed to enable zswap"
+		_launch_zram no
+		exit 3
+	fi
+
+	_launch_zram yes
 }
 
 stop() {
-  UCI_RUN=yes zswap_available || exit $?
-  printf "N" >$ZSWAP_SYSFS/enabled
-  printf "0" >$ZSWAP_SYSFS/max_pool_percent
-  enabled=$(cat $ZSWAP_SYSFS/enabled)
-  if [ "x$enabled" = "xN" ]; then
-    log_msg "info: successfully disabled"
-  else
-    log_msg "error: could not disable the zswap pool"
-    exit 4
-  fi
+	UCI_RUN=yes zswap_available || exit $?
+	printf "N" >$ZSWAP_SYSFS/enabled
+	printf "0" >$ZSWAP_SYSFS/max_pool_percent
+	enabled=$(cat $ZSWAP_SYSFS/enabled)
+	if [ "x$enabled" = "xN" ]; then
+		log_msg "zswap disabled successfully"
+	else
+		log_msg "Failed to disable zswap"
+		exit 4
+	fi
 }
 
 status() {
-  UCI_RUN=yes zswap_available || exit $?
-  local max_pool=$(cat $ZSWAP_SYSFS/max_pool_percent)
-  local compressor=$(cat $ZSWAP_SYSFS/compressor)
-  local enabled=$(cat $ZSWAP_SYSFS/enabled)
-  local zpool=$(cat $ZSWAP_SYSFS/zpool)
-  local ram_size=$(ram_getsize)
-  local page_size=4096
-  cat $ZSWAP_DEBUGFS/* | xargs | awk -v mib="$MIB" \
-    -v mb="1000000" \
-    -v kib="$KIB" \
-    -v kb="1000" \
-    -v max_pool="$max_pool" \
-    -v compressor="$compressor" \
-    -v enabled="$enabled" \
-    -v zpool="$zpool" \
-    -v ram="$ram_size" \
-    -v pgsz="$page_size" \
-    'BEGIN { f = "%-35s - %.2f %s\n"
-      f2 = "%-35s - %d %s\n"
-      f3 = "%-35s - %s\n"
-      f4 = "%-35s - %.2f %s (%.2f %s)\n"}
-    { print "Gathering stats info for zswap subsystem"
-      print "\nZSWAP\n-----"
-      printf f3, "Currently enabled (Y/N)", enabled
-      printf f3, "Compression algorithm", compressor
-      printf f3, "Memory allocator (zpool)", zpool
-      printf f4, "Max. memory pool", max_pool, "%", ram*max_pool*10/mib, "MiB"
-      print "\nSTATS\n-----"
-      printf f3, "Duplicate entry", $1
-      printf f3, "Times pool limit hit", $2
-      printf f3, "Rejected due to alloc. fail", $4
-      printf f3, "Rejected due to bad compression", $5
-      printf f3, "Rejected due to kmemcache fail", $6
-      printf f3, "Rejected due to reclaim failed", $7
-      printf f3, "Same-filled pages (identical)", $8
-      printf f3, "Pages currently in the pool", $9
-      printf f3, "Pages wrote-back to storage", $10
-      print "\nDATA\n----"
-      printf f4, "System memory", ram/kib, "MiB", ram/kb, "MB"
-      printf f4, "Pool total size", $3/mib, "MiB", $3/(ram*10), "%"
-      printf f4, "Original data size", $9*pgsz/mib, "MiB", $9*pgsz/(ram*10), "%"
-      printf f4, "Estimated savings", ($9*pgsz-$3)/mib, "MiB", ($9*pgsz-$3)/(ram*10), "%"
-      printf f, "Compression ratio (data only)", ($9*pgsz+1)/($3+1), ""
-      print "" }'
+	UCI_RUN=yes zswap_available || exit $?
+	local max_pool=$(cat $ZSWAP_SYSFS/max_pool_percent)
+	local compressor=$(cat $ZSWAP_SYSFS/compressor)
+	local enabled=$(cat $ZSWAP_SYSFS/enabled)
+	local zpool=$(cat $ZSWAP_SYSFS/zpool)
+	local ram_size=$(ram_getsize)
+	local page_size=$(_get_page_size)
+	local accept_threshold=""
+	[ -f "$ZSWAP_SYSFS/accept_threshold_percent" ] && \
+		accept_threshold=$(cat $ZSWAP_SYSFS/accept_threshold_percent 2>/dev/null)
+	local shrinker=""
+	[ -f "$ZSWAP_SYSFS/shrinker_enabled" ] && \
+		shrinker=$(cat $ZSWAP_SYSFS/shrinker_enabled 2>/dev/null)
+
+	# Read each debugfs file by name for cross-kernel compatibility
+	local _stat_pool_limit_hit="" _stat_pool_total_size=""
+	local _stat_reject_alloc_fail="" _stat_reject_compress_fail=""
+	local _stat_reject_compress_poor="" _stat_reject_kmemcache_fail=""
+	local _stat_reject_reclaim_fail="" _stat_stored_pages=""
+	local _stat_written_back_pages=""
+	# Legacy fields (removed in newer kernels)
+	local _stat_duplicate_entry="" _stat_same_filled_pages=""
+
+	for _f in $ZSWAP_DEBUGFS/*; do
+		[ -f "$_f" ] || continue
+		_name=$(basename "$_f")
+		_val=$(cat "$_f" 2>/dev/null)
+		if [ -z "$_val" ]; then continue; fi
+		case "$_name" in
+			pool_limit_hit)          _stat_pool_limit_hit="$_val" ;;
+			pool_total_size)         _stat_pool_total_size="$_val" ;;
+			reject_alloc_fail)       _stat_reject_alloc_fail="$_val" ;;
+			reject_compress_fail)    _stat_reject_compress_fail="$_val" ;;
+			reject_compress_poor)    _stat_reject_compress_poor="$_val" ;;
+			reject_kmemcache_fail)   _stat_reject_kmemcache_fail="$_val" ;;
+			reject_reclaim_fail)     _stat_reject_reclaim_fail="$_val" ;;
+			stored_pages)            _stat_stored_pages="$_val" ;;
+			written_back_pages)      _stat_written_back_pages="$_val" ;;
+			duplicate_entry)         _stat_duplicate_entry="$_val" ;;
+			same_filled_pages)       _stat_same_filled_pages="$_val" ;;
+			*) log_msg "Warning: unknown debugfs entry '$_name'" ;;
+		esac
+	done
+
+	awk -v mib="$MIB" \
+		-v mb="1000000" \
+		-v max_pool="$max_pool" \
+		-v compressor="$compressor" \
+		-v enabled="$enabled" \
+		-v zpool="$zpool" \
+		-v ram="$ram_size" \
+		-v pgsz="$page_size" \
+		-v accept_thr="$accept_threshold" \
+		-v shrinker="$shrinker" \
+		-v pool_limit_hit="$_stat_pool_limit_hit" \
+		-v pool_total_size="$_stat_pool_total_size" \
+		-v reject_alloc="$_stat_reject_alloc_fail" \
+		-v reject_compress="$_stat_reject_compress_fail" \
+		-v reject_poor="$_stat_reject_compress_poor" \
+		-v reject_kmem="$_stat_reject_kmemcache_fail" \
+		-v reject_reclaim="$_stat_reject_reclaim_fail" \
+		-v stored="$_stat_stored_pages" \
+		-v written_back="$_stat_written_back_pages" \
+		-v dup_entry="$_stat_duplicate_entry" \
+		-v same_filled="$_stat_same_filled_pages" \
+		'BEGIN { f = "%-35s - %.2f %s\n"
+			f3 = "%-35s - %s\n"
+			f4 = "%-35s - %.2f %s (%.2f %s)\n"
+			print "zswap statistics"
+			print "\nCONFIG\n------"
+			printf f3, "Enabled", enabled
+			printf f3, "Compressor", compressor
+			printf f3, "Allocator (zpool)", zpool
+			printf f4, "Max pool", max_pool, "%", ram*max_pool/100/mib, "MiB"
+			if (accept_thr != "") printf f3, "Accept threshold", accept_thr "%"
+			if (shrinker != "") printf f3, "Shrinker", shrinker
+			print "\nSTATS\n-----"
+			if (dup_entry != "") printf f3, "Duplicate entries", dup_entry
+			if (pool_limit_hit != "") printf f3, "Pool limit hits", pool_limit_hit
+			if (reject_alloc != "") printf f3, "Alloc failures", reject_alloc
+			if (reject_compress != "") printf f3, "Compression failures", reject_compress
+			if (reject_poor != "") printf f3, "Poor compression rejects", reject_poor
+			if (reject_kmem != "") printf f3, "Kmemcache failures", reject_kmem
+			if (reject_reclaim != "") printf f3, "Reclaim failures", reject_reclaim
+			if (same_filled != "") printf f3, "Same-filled pages", same_filled
+			if (stored != "") printf f3, "Pages in pool", stored
+			if (written_back != "") printf f3, "Pages written back", written_back
+			ps = (pool_total_size != "") ? pool_total_size + 0 : 0
+			sp = (stored != "") ? stored + 0 : 0
+			print "\nMEMORY\n------"
+			printf f4, "System RAM", ram/mib, "MiB", ram/mb, "MB"
+			if (pool_total_size != "") printf f4, "Pool size", ps/mib, "MiB", ps*100/ram, "%"
+			if (stored != "") printf f4, "Original data", sp*pgsz/mib, "MiB", sp*pgsz*100/ram, "%"
+			if (pool_total_size != "" && stored != "") {
+				printf f4, "Savings", (sp*pgsz-ps)/mib, "MiB", (sp*pgsz-ps)*100/ram, "%"
+				printf f, "Compression ratio", (sp*pgsz+1)/(ps+1), ""
+			}
+			print "" }' /dev/null
 }

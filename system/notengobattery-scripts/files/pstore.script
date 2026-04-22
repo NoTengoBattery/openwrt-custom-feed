@@ -1,6 +1,9 @@
 #!/bin/sh
 #
-# Problems? Sugestions? Visit: https://www.notengobattery.com
+# Copyright (C) 2019-2026 Oever González <software@notengobattery.com>
+#
+# Licensed to the public under the Apache License 2.0.
+# Problems? Suggestions? software@notengobattery.com
 #
 
 # As soon as we have the correct date and time, move the logs to a persistent
@@ -15,7 +18,7 @@ if [ "x$ACTION" = "xstratum" ]; then
     mkdir -p $output_dir
     mv -f /sys/fs/pstore/* $output_dir
     for stored in $output_dir/*; do
-      bzip2 -tq9 -z $stored &
+      bzip2 -9 $stored &
       if [ $? -eq 0 ]; then
         printf "pstore: collected an compressed $(basename $stored) from last boot" >/dev/kmsg
       fi

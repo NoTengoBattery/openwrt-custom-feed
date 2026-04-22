@@ -1,10 +1,10 @@
 {
-	"admin/system/compressed_memory": {
+	"admin/system/compressed-memory": {
 		"title": "Compressed Memory",
 		"order": 51,
 		"action": {
 			"type": "view",
-			"path": "system/compressed_memory"
+			"path": "system/compressed-memory"
 		},
 		"depends": {
 			"acl": [

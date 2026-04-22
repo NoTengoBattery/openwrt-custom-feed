@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Problems? Sugestions? Visit: https://www.notengobattery.com
+# Problems? Suggestions? software@notengobattery.com
 #
 
 [ "0$(uci -q get system.@system[0].notengobattery)" -eq 2 ] && exit 0
@@ -10,13 +10,13 @@ board=$(board_name)
 
 case "$board" in
 asus,rt-ac58u)
-  DEVICE_HOSTNAME=Retweet
+  DEVICE_HOSTNAME=RT-AC58U
   ;;
 avm,fritzbox-4040)
-  DEVICE_HOSTNAME=Friki
+  DEVICE_HOSTNAME=FritzBox-4040
   ;;
 ezviz,cs-w3-wd1200g-eup)
-  DEVICE_HOSTNAME=Vitzio
+  DEVICE_HOSTNAME=CS-W3-WD1200G-EUP
   ;;
 glinet,gl-b1300)
   DEVICE_HOSTNAME=Convexa-B
@@ -33,47 +33,40 @@ linksys,ea8300 | \
   DEVICE_HOSTNAME=Dallas
   ;;
 mikrotik,hap-ac2)
-  DEVICE_HOSTNAME=Actinium
+  DEVICE_HOSTNAME=HAP-AC2
   ;;
 zbtlink,zbt-wg3526-16m)
-  DEVICE_HOSTNAME=Glucose
+  DEVICE_HOSTNAME=WG3526-16M
   ;;
 zbtlink,zbt-wg3526-32m)
-  DEVICE_HOSTNAME=Galactose
+  DEVICE_HOSTNAME=WG3526-32M
   ;;
 zyxel,nbg6617)
-  DEVICE_HOSTNAME=Zixane
+  DEVICE_HOSTNAME=NBG6617
+  ;;
+cwwk-cw-mbx-ad12)
+  DEVICE_HOSTNAME=MBX-AD12
   ;;
 *)
   logger -s -t ntb_def -p user.err "Unsupported hardware '$board'."
-  exit 0
   ;;
 esac
 
 chsh root -s /bin/bash
 
 uci batch <<EOI
-  set system.@system[0].hostname=$DEVICE_HOSTNAME
-  set system.@system[0].log_file='/dev/pmsg0'
-  set system.@system[0].log_size='2048'
-  set system.@system[0].conloglevel='5'
-  set system.@system[0].cronloglevel='9'
+  set system.system.conloglevel='7'
+  set system.system.cronloglevel='7'
+  set system.system.hostname='${DEVICE_HOSTNAME}'
+  set system.system.log_file='/dev/pmsg0'
+  set system.system.log_size='2048'
 
-  set network.globals.packet_steering='1'
-  set network.wan.dns='127.0.0.1'
-  set network.wan.peerdns='0'
-  set network.wan6.dns='::1'
-  set network.wan6.ifname='@wan'
-  set network.wan6.peerdns='0'
+  set network.globals.packet_steering='2'
 
-  set firewall.@defaults[0].flow_offloading='1'
+  set firewall.@defaults[0].synflood_protect='1'
+  set firewall.@defaults[0].syn_flood='1'
 
-  set dropbear.@dropbear[0].Interface='lan'
-
-  add_list dhcp.@dnsmasq[0].server='127.0.0.1#10053'
-  add_list dhcp.@dnsmasq[0].server='::1#10053'
-  set dhcp.@dnsmasq[0].noresolv='1'
-  set dhcp.lan.leasetime='24h'
+  set irqbalance.irqbalance.enabled='1'
 
   set system.@system[0].notengobattery=2
   commit

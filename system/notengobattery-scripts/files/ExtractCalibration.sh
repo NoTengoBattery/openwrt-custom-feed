@@ -1,4 +1,10 @@
 #!/bin/bash
+#
+# Copyright (C) 2019-2026 Oever González <software@notengobattery.com>
+#
+# Licensed to the public under the Apache License 2.0.
+# Problems? Suggestions? software@notengobattery.com
+#
 
 ROOT_PATH='/Users/notengobattery/3.1.10.191322/rootfs'
 REGEX='.*boardData.*\.bin'

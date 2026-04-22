@@ -1,14 +1,14 @@
 #
-# Copyright (C) 2019-2021 Oever González <software@notengobattery.com>
+# Copyright (C) 2019-2026 Oever González <software@notengobattery.com>
 #
 # Licensed to the public under the Apache License 2.0.
-# Problems? Sugestions? Visit: https://www.notengobattery.com
+# Problems? Suggestions? software@notengobattery.com
 #
 
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=compressed-memory
-PKG_VERSION:=1.0.11
+PKG_VERSION:=1.1.0
 PKG_RELEASE:=0
 PKG_MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 
@@ -21,17 +21,27 @@ define Package/compressed-memory
 	SECTION:=utils
 	CATEGORY:=Base system
 	DEPENDS:= \
+	+@BUSYBOX_CONFIG_AWK \
+	+@BUSYBOX_CONFIG_BB_SYSCTL \
+	+@BUSYBOX_CONFIG_CAT \
+	+@BUSYBOX_CONFIG_ECHO \
+	+@BUSYBOX_CONFIG_ENV \
+	+@BUSYBOX_CONFIG_FEATURE_AWK_GNU_EXTENSIONS \
+	+@BUSYBOX_CONFIG_FEATURE_AWK_LIBM \
+	+@BUSYBOX_CONFIG_FEATURE_MKSWAP_UUID \
 	+@BUSYBOX_CONFIG_FEATURE_SWAPON_DISCARD \
 	+@BUSYBOX_CONFIG_FEATURE_SWAPON_PRI \
+	+@BUSYBOX_CONFIG_FEATURE_SWAPONOFF_LABEL \
+	+@BUSYBOX_CONFIG_GREP \
+	+@BUSYBOX_CONFIG_LOGGER \
 	+@BUSYBOX_CONFIG_MKSWAP \
+	+@BUSYBOX_CONFIG_PRINTF \
+	+@BUSYBOX_CONFIG_RM \
+	+@BUSYBOX_CONFIG_SLEEP \
 	+@BUSYBOX_CONFIG_SWAPOFF \
 	+@BUSYBOX_CONFIG_SWAPON \
 	+gawk \
-	+kmod-crypto-deflate \
-	+kmod-crypto-zstd \
-	+kmod-lib-lz4 \
-	+kmod-lib-lz4hc \
-	+kmod-lib-lzo
+	+uci
 	HIDDEN:=1
 	TITLE:=Configuration files for compressed-memory
 	MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
@@ -50,9 +60,16 @@ define Package/swap-zram
 	SECTION:=utils
 	CATEGORY:=Base system
 	DEPENDS:= \
+	+@KERNEL_ZRAM_BACKEND_842 \
+	+@KERNEL_ZRAM_BACKEND_DEFLATE \
+	+@KERNEL_ZRAM_BACKEND_LZ4 \
+	+@KERNEL_ZRAM_BACKEND_LZ4HC \
+	+@KERNEL_ZRAM_BACKEND_LZO \
+	+@KERNEL_ZRAM_BACKEND_ZSTD \
+	+@KERNEL_ZRAM_WRITEBACK \
 	+compressed-memory \
 	+kmod-loop \
-	+kmod-zram-writeback \
+	+kmod-zram \
 	+losetup
 	TITLE:=Script to manage compressed memory for swap
 	MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
@@ -72,6 +89,7 @@ define Package/swap-zswap
 	SECTION:=utils
 	CATEGORY:=Base system
 	DEPENDS:= \
+	+@KERNEL_ZSWAP_SHRINKER_DEFAULT_ON \
 	+compressed-memory \
 	+kmod-zswap
 	TITLE:=Script to manage compressed LRU cache for swap
@@ -100,6 +118,8 @@ endef
 define Package/compressed-memory/install
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/compressed_memory.uci $(1)/etc/config/compressed_memory
+	$(INSTALL_DIR) $(1)/usr/libexec
+	$(INSTALL_BIN) ./files/common.script $(1)/usr/libexec/zmemory.common
 endef
 
 

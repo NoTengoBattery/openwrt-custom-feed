@@ -1,0 +1,120 @@
+#!/bin/sh
+#
+# Copyright (C) 2019-2026 Oever González <software@notengobattery.com>
+#
+# Licensed to the public under the Apache License 2.0.
+# Problems? Suggestions? software@notengobattery.com
+#
+# Common functions for compressed-memory scripts
+#
+
+readonly KIB=1024
+readonly MIB=1048576
+readonly CONFIG=compressed_memory
+
+log_msg() {
+	logger -s -t "${LOG_TAG:-compressed-memory}" -p "user.info" "$@"
+}
+
+_do_math() {
+	local decimals="$1"
+	local expression="$2"
+	awk 'END{ f = "%.'"$decimals"'f"; printf f, '"$expression"' }' /dev/null
+}
+
+_do_compare() {
+	_do_math 0 "($1)?1:0"
+}
+
+ram_getsize() {
+	local kib=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+	_do_math 0 "$kib * 1024"
+}
+
+# Detect the kernel page size at runtime from /proc/meminfo and /proc/vmstat
+# Formula: MemFree (bytes) / nr_free_pages, rounded to nearest power of 2
+# Fallback: 4096
+_get_page_size() {
+	local memfree_kib=$(awk '/MemFree/ {print $2}' /proc/meminfo)
+	local nr_free=$(awk '/^nr_free_pages / {print $2}' /proc/vmstat)
+	if [ -n "$memfree_kib" ] && [ -n "$nr_free" ] && [ "$nr_free" -gt 0 ] 2>/dev/null; then
+		# Calculate and round to nearest power of 2
+		local raw=$(_do_math 0 "$memfree_kib * 1024 / $nr_free")
+		# Round: find highest power of 2 <= raw (integer log2 then shift)
+		awk -v r="$raw" 'BEGIN {
+			p = 1; while (p * 2 <= r) p *= 2
+			if (r - p > p * 2 - r) p *= 2
+			printf "%d", p
+		}' /dev/null
+	else
+		printf "4096"
+	fi
+}
+
+# Apply VM tuning for compressed memory
+# Usage: apply_vm_tuning [swappiness]
+apply_vm_tuning() {
+	local swappiness="$1"
+	config_load "$CONFIG"
+
+	# Enable Multi-Gen LRU if available and configured
+	local lru_gen_enabled
+	config_get_bool lru_gen_enabled tuning lru_gen '1'
+	if [ "$lru_gen_enabled" = "1" ] && [ -f /sys/kernel/mm/lru_gen/enabled ]; then
+		local current=$(cat /sys/kernel/mm/lru_gen/enabled 2>/dev/null)
+		local lru_gen_features
+		config_get lru_gen_features tuning lru_gen_features '7'
+		# Detect hex bitmask format (0x0001) vs legacy y/Y format
+		case "$current" in
+			0x*)
+				# Hex bitmask: check if target features are already set
+				local current_dec=$(printf '%d' "$current" 2>/dev/null)
+				local target_dec=$(printf '%d' "$lru_gen_features" 2>/dev/null)
+				if [ "$current_dec" -ne "$target_dec" ] 2>/dev/null; then
+					printf "$lru_gen_features" > /sys/kernel/mm/lru_gen/enabled 2>/dev/null
+					# Read back: kernel caps to compiled-in features
+					local actual=$(cat /sys/kernel/mm/lru_gen/enabled 2>/dev/null)
+					log_msg "Set Multi-Gen LRU features to $actual (requested $lru_gen_features, was $current)"
+				fi
+				;;
+			[yY])
+				# Legacy format: already enabled
+				;;
+			*)
+				# Legacy format: not enabled, or numeric without 0x prefix
+				if [ "$current" != "y" ] && [ "$current" != "Y" ]; then
+					printf "$lru_gen_features" > /sys/kernel/mm/lru_gen/enabled 2>/dev/null
+					log_msg "Enabled Multi-Gen LRU (features=$lru_gen_features)"
+				fi
+				;;
+		esac
+		local min_ttl
+		config_get min_ttl tuning lru_gen_min_ttl '1000'
+		if [ -f /sys/kernel/mm/lru_gen/min_ttl_ms ]; then
+			printf "$min_ttl" > /sys/kernel/mm/lru_gen/min_ttl_ms 2>/dev/null
+			log_msg "Set LRU Gen minimum TTL to $min_ttl ms"
+		fi
+	fi
+
+	# Set page-cluster to 0 and disable VMA-based swap readahead for compressed swap
+	# Both settings serve the same purpose: avoid unnecessary readahead when swap
+	# data is already in RAM (compressed). page-cluster disables cluster readahead,
+	# vma_ra_enabled disables VMA-based readahead.
+	local page_cluster_enabled
+	config_get_bool page_cluster_enabled tuning page_cluster '1'
+	if [ "$page_cluster_enabled" = "1" ]; then
+		sysctl -w vm.page-cluster=0 >/dev/null 2>&1
+		log_msg "Set page-cluster to 0 for single-page reads"
+		if [ -f /sys/kernel/mm/swap/vma_ra_enabled ]; then
+			printf "false" > /sys/kernel/mm/swap/vma_ra_enabled 2>/dev/null
+			log_msg "Disabled VMA-based swap readahead"
+		fi
+	fi
+
+	# Set swappiness if provided
+	if [ -n "$swappiness" ]; then
+		sysctl -w vm.swappiness="$swappiness" >/dev/null 2>&1
+		log_msg "Set swappiness to $swappiness"
+	fi
+}
+

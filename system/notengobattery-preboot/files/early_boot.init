@@ -1,6 +1,6 @@
 #!/bin/sh /etc/rc.common
 #
-# Problems? Sugestions? Visit: https://www.notengobattery.com
+# Problems? Suggestions? software@notengobattery.com
 #
 
 NAME=early_boot

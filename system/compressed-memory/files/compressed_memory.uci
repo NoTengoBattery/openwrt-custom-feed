@@ -1,90 +1,121 @@
+#
+# Problems? Suggestions? software@notengobattery.com
+#
+
+# Global settings for compressed memory subsystem
+config tuning 'tuning'
+	# Enable Multi-Gen LRU for better page reclaim (kernel 6.1+)
+	option lru_gen '1'
+	# MGLRU feature bitmask: 0x1=core, 0x2=clear leaf PTE accessed, 0x4=clear non-leaf PTE accessed
+	# 7 enables all features for best performance with compressed swap
+	option lru_gen_features '7'
+	# Min TTL in ms for LRU Gen (reduces unnecessary reclaim)
+	option lru_gen_min_ttl '1000'
+	# Set page-cluster to 0 and disable VMA readahead for compressed swap
+	# Both avoid unnecessary readahead when swap data is already in RAM (compressed)
+	option page_cluster '1'
+	# When zram and zswap are combined:
+	# - compressor for zram
+	option compressor_scale 'deflate'
+	# - pool split between zswap (L1) and zram (L2)
+	option zswap_scale_pool '50.00'
+	# - page distribution for effective ratio (normalized with incomp)
+	option evicted_to_zram '0.50'
+	option rejected_to_zram '0.50'
+	# - swappiness when both zswap and zram are enabled
+	option swappiness_combined '180'
 
 config params 'zram'
-	# This is the main switch for the zram script
-	option enabled	'1'
-	# The compression algorithm to use for the zram device
-	option algorithm	'lzo_rle'
-	# Base pool % which is scaled by the expected compression ratio
-	option pool_base	'50.00'
-	# Hard pool % which clamp the maximum size of the zram device
-	#   This value is scaled by the worst expected compression ratio
-	option pool_limit	'200'
-	# The worst ratio that is expected by the worst compression algorithm
-	#  This value should never be less than 1.00
-	option worst_ratio	'1.040'
-	# zram can evict pages that are hard to compress to a backing storage,
-	#  which must have to be a block device, or a file in a loop device
-#	option backing_file	'/data/zram.img'
+	# Enable the zram compressed block device as swap
+	option enabled '1'
+	# Compression algorithm (see compress sections below)
+	# Default: deflate - similar ratio to zstd but much more stable (lower OOM rate, tighter stddev)
+	option algorithm 'deflate'
+	# Base pool % scaled by expected compression ratio
+	option pool_base '30.00'
+	# Hard limit % for zram disk size (scaled by worst ratio)
+	option pool_limit '150'
+	# Worst expected memory efficiency multiplier (< 1.0 due to zpool allocator overhead)
+	# Even 1:1 stored pages use more memory due to metadata and fragmentation
+	option worst_ratio '0.95'
+	# Swappiness when zram is enabled alone (0-200)
+	option swappiness '120'
+	# Backing storage for incompressible pages (optional)
+#	option backing_file '/data/zram.img'
 
 config params 'zswap'
-	# This is the main switch for the zswap script
-	option enabled	'1'
-	# Default compression algorithm, the same options for zram
-	#  There is no gain in selecting a better one, because the zpool limits
-	#  the compression ratio of the data
-	option algorithm	'lzo_rle'
-	# Size of the memory pool for zswap (if zram is not enabled)
-	option pool	'20.00'
-	# This is the zpool, z3fold guarantees a max compression ratio of 3.00
-	#  while zbud guarantees a max compression ratio of 2.00
-	option zpool	'z3fold'
-	# Adjust the system swappiness to this value when zswap is enabled
-	option swappiness	'80'
+	# Enable zswap compressed page cache
+	option enabled '1'
+	# Compression algorithm (fast algorithms preferred)
+	option algorithm 'lz4'
+	# Memory pool % when zram is not enabled
+	option pool '20.00'
+	# Memory allocator: zbud (limited ratio) or zsmalloc (better ratio)
+	option zpool 'zsmalloc'
+	# Swappiness when zswap alone (0-200)
+	option swappiness '120'
+	# Accept threshold: resume accepting pages when pool usage drops below this %
+	# Prevents thrashing when pool is near-full (100 disables hysteresis)
+	option accept_threshold '90'
+	# Shrinker: proactive cold page eviction from zswap to backing swap
+	option shrinker '1'
 
-	# zswap will be adjusted in the presence of zram, and also will modify zram
-	#  parameters in order to prevent excesive memory usage.
-
-	# The compressor to use for zram, this should be the higher compression
-	option compressor_scale	'zstd'
-	# The target underestimate compression ratio for the above compressor
-	option compressor_factor	'0.925'
-	# This will scale the zswap pool to a percentage of the zram pool
-	option zswap_scale_pool	'15.00'
-
-# Define the compression algorithms:
-#  The expected ratio is what defines the capacity to save RAM, where higher
-#   is better. Generally, higher compression ration leads to more latency.
-#  The streams factor defines the maximum CPU cores to be used. Where 100 is
-#   to use all CPUs. The lower it is, the faster that the compression algorithm
-#   is. Also known as the "cost".
+# Compression algorithms with empirically measured characteristics (median values)
+# Expected ratio, incompressible page ratio, speed, and stability scores
+# are derived from real workload testing using median aggregation
 
 config compress 'deflate'
-	option driver	'deflate'
-	option expected_ratio	'4.460'
-	option streams_factor	'100.00'
+	option driver 'deflate'
+	option expected_ratio '4.75'
+	option incomp_ratio '0.0306'
+	option speed_score '0.10'
+	option stability_score '1.00'
 
-config compress 'zstd'
-	option driver	'zstd'
-	option expected_ratio	'4.305'
-	option streams_factor	'91.15'
+config compress '842'
+	option driver '842'
+	option expected_ratio '3.05'
+	option incomp_ratio '0.0336'
+	option speed_score '0.15'
+	option stability_score '0.87'
 
 config compress 'lz4hc'
-	option driver	'lz4hc'
-	option expected_ratio	'3.540'
-	option streams_factor	'100.00'
-
-config compress 'lzo'
-	option driver	'lzo'
-	option expected_ratio	'3.400'
-	option streams_factor	'39.05'
-
-config compress 'lzo_rle'
-	option driver	'lzo-rle'
-	option expected_ratio	'3.330'
-	option streams_factor	'17.80'
+	option driver 'lz4hc'
+	option expected_ratio '3.70'
+	option incomp_ratio '0.0347'
+	option speed_score '0.20'
+	option stability_score '0.62'
 
 config compress 'lz4'
-	option driver	'lz4'
-	option expected_ratio	'3.205'
-	option streams_factor	'52.40'
+	option driver 'lz4'
+	option expected_ratio '3.45'
+	option incomp_ratio '0.0339'
+	option speed_score '1.00'
+	option stability_score '0.45'
 
-# Define the zpools:
-#  These zpools will limit the maximum compression ratio of zswap
+config compress 'zstd'
+	option driver 'zstd'
+	option expected_ratio '4.80'
+	option incomp_ratio '0.0315'
+	option speed_score '0.42'
+	option stability_score '0.38'
+
+config compress 'lzo'
+	option driver 'lzo'
+	option expected_ratio '3.80'
+	option incomp_ratio '0.0323'
+	option speed_score '0.98'
+	option stability_score '0.36'
+
+config compress 'lzo_rle'
+	option driver 'lzo-rle'
+	option expected_ratio '3.75'
+	option incomp_ratio '0.0363'
+	option speed_score '0.98'
+	option stability_score '0.29'
+
+# Memory allocators (zpools) for zswap
+# These limit the effective compression ratio
 
 config zpool 'zbud'
-	# zbud guarantees a 2.00 compression ratio
-	option expected_ratio	'2.000'
 
-config zpool 'z3fold'
-	# zbud guarantees a 3.00 compression ratio
-	option expected_ratio	'3.000'
+config zpool 'zsmalloc'

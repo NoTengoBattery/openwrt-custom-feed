@@ -1,6 +1,9 @@
 #!/bin/bash
 #
-# Problems? Sugestions? Visit: https://www.notengobattery.com
+# Copyright (C) 2019-2026 Oever González <software@notengobattery.com>
+#
+# Licensed to the public under the Apache License 2.0.
+# Problems? Suggestions? software@notengobattery.com
 #
 
 source /lib/functions.sh

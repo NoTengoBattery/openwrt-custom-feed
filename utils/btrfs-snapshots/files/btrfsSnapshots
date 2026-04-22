@@ -1,0 +1,1005 @@
+#!/usr/bin/env python3
+"""
+BTRFS Snapshots is a Python helper for maintaining rolling snapshots of a subvolumes and
+synchronizing these snapshots to an external source.
+
+For more information see: http://btrfsSnapshots.DrQue.net
+
+(C) Copyright 2022/2025 by Andrew Que
+Full license at bottom.
+"""
+
+import os
+import re
+import sys
+import enum
+import json
+import stat
+import argparse
+import datetime
+import tempfile
+import subprocess
+
+__author__     = "Andrew Que"
+__version__    = "1.0.2"
+__contact__    = "http://btrfsSnapshots.DrQue.net"
+__copyright__  = "(C) Copyright 2022/2025 by Andrew Que (https://www.DrQue.net/)"
+__license__    = "GPLv3"
+__maintainer__ = "Andrew Que"
+__status__     = "Production"
+
+PROGRAM_VERSION = f"{__version__}"
+
+PROGRAM_TITLE = f"BTRFS Snapshot Tool v{PROGRAM_VERSION}"
+
+# Levels of verbosity.
+# The higher the value, the more important the message.
+Verbosity = enum.IntEnum( 'Verbosity', 'normal quiet error' )
+
+# Bash script heading.
+# A simple fail function that can run should process fail.
+SCRIPT_HEADING = """#!/bin/bash
+set -e -o pipefail
+
+#------------------------------------------------------------------------------
+# Uses:
+#   Print error and exit.
+# Input:
+#   $1 - Error message to display.
+#------------------------------------------------------------------------------
+fail()
+{
+  echo "ERROR: $1" > /dev/stderr
+  exit 1
+}
+
+"""
+
+#------------------------------------------------------------------------------
+def log( verbosity, *arguments, **key_arguments ) :
+    """
+    Log message of a specific type.
+    Limited by configured verbosity.
+
+    Input:
+      *arguments, ***key_arguments - Parameters identical to those of `print`.
+    """
+    if verbosity >= Configuration.verbosity :
+        print( *arguments, **key_arguments )
+
+#------------------------------------------------------------------------------
+def error( message ) :
+    """
+    Display error message and exit.
+    """
+    log( Verbosity.error, message, file=sys.stderr )
+    exit( 1 )
+
+class Configuration :
+    """
+    Static instance of configuration.
+    """
+    # Path to source subvolume.
+    source = None
+
+    # Path to destination (where snapshots are placed).
+    destination = None
+
+    # Remote server (when snapshots are sent).
+    remote = None
+
+    # For named snapshots.
+    # (Disabled by default)
+    name = None
+
+    # Most recent number of snapshots to keep.
+    # Useful for snapshots taken multiple times of day.
+    # Setting to 0 disable and only use other setting.
+    keep_last_snapshots = 7
+
+    # Number of most recent days to keep.
+    # Last snapshot for saved day it kept.
+    # Set to -1 to save all days.
+    keep_last_days = 5
+
+    # Number of most recent months to keep.
+    # Last snapshot in saved month it kept.
+    # Set to -1 to save all months.
+    keep_last_months = 3
+
+    # Number of most recent years to keep.
+    # Last snapshot in saved year it kept.
+    # Set to -1 to save all years.
+    keep_last_years = 3
+
+    # Force a snapshot even if it has not changed.
+    force = False
+
+    #
+    # Method in which snapshots date is formatted.
+    # The two formats need to match.
+    #
+
+    # The date timestamp for snapshot names.
+    # (Format for `datetime.datetime.strptime`)
+    # This is the format the snapshots name is saved.
+    snapshot_name_format = "%Y-%m-%d %H:%M:%S"
+
+    # Format of saved dates.  This may differ slightly from the date used to save
+    # snapshots.  For example, the seconds or minutes might be forced to zero in
+    # the snapshot name, but the field still present.  This format accounts for all
+    # fields in date format.
+    date_format = "%Y-%m-%d %H:%M:%S"
+
+    # Regular expression to select the snapshot directories by date.
+    # Must be able to match time stamps created by `date_format`.
+    date_regular_expression = r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})$"
+
+    # Path to `btrfs` utility.
+    btrfs = "/bin/btrfs"
+
+    # Debug flag.  Will not make any changes when set to `True`.
+    dry_run = False
+
+    # Console output verbosity.
+    verbosity = Verbosity.normal
+
+    # Path to `rsync` utility.
+    rsync = "/usr/bin/rsync"
+
+    # Additional options for `rsync` for change detection.
+    # Typically for ignoring files.
+    rsync_options = None
+
+    # True to save rsync differences files for each snapshot.
+    rsync_change_file = False
+
+    def load( file_name ) :
+        """
+        Load configuration from JSON file.
+
+        Parameters
+        ----------
+        file_name : str
+            Name of configuration file.
+        """
+        with open( file_name ) as input_file :
+            try :
+                configuration_data = json.load( input_file )
+            except json.decoder.JSONDecodeError as exception :
+                error( f"Unable to load '{file_name}' due to invalid JSON: " + str( exception ) )
+
+            for key, value in configuration_data.items() :
+                if hasattr( Configuration, key ) :
+                    setattr( Configuration, key, value )
+                else :
+                    error( f"Unknown configuration setting '{key}'" )
+
+#------------------------------------------------------------------------------
+def run_process( command ) :
+    """
+    Execute an external command, and halt if it fails.
+
+    Parameters
+    ----------
+    command : list( str )
+        Command to execute.  What is sent to `subprocess.run`.
+
+    Returns
+    -------
+    Instance of subprocess as long as it doesn't have an error code returned.
+    """
+    process = subprocess.run( command, capture_output=True )
+
+    # Fail on errors.
+    if 0 != process.returncode :
+        log(
+            Verbosity.error,
+            "Error code", process.returncode,
+            "out", process.stdout.decode(),
+            "error", process.stderr.decode(),
+            file=sys.stderr
+        )
+        exit( 1 )
+
+    return process
+
+#------------------------------------------------------------------------------
+def prune( dates, keep_last_snapshots, keep_last_days, keep_last_months, keep_last_years ) :
+    """
+    Generate a list of dates to keep.
+
+    Parameters
+    ----------
+    dates : list
+        List of dates to prune.
+    keep_last_snapshots : int
+        Minimum number of snapshots to preserve.
+    keep_last_days : int
+        Keep at least one snapshot for this number of days ago.
+    keep_last_months : int
+        Keep at least one snapshot for this number of months ago.
+    keep_last_years : int
+        Keep at least one snapshot for this number of years ago.
+
+    Returns
+    -------
+    Set of dates that should be preserved.
+    """
+
+    if len( dates ) < 1 :
+        return set()
+
+    # Dates must be sorted for the most recent (first in list) to oldest.
+    dates.sort( reverse=True )
+
+    # Set of dates to keep.
+    # Start with the minimum number of snapshots to keep.
+    keep = set( dates[ : keep_last_snapshots ] )
+
+    # Truncate date to just years, month and day.
+    def truncate_date( date ) :
+        date_as_tuple = date.timetuple()
+        truncated_tuple = date_as_tuple[ : 3 ]
+        return datetime.datetime( *truncated_tuple )
+
+    # The first date is the starting point.
+    day_count = keep_last_days
+    start_date = truncate_date( dates[ 0 ] )
+    for date in dates :
+        truncated_date = truncate_date( date )
+
+        # How much time passed between the starting date in this date.
+        delta = start_date - truncated_date
+
+        # Keep this date if a day or more has passed, and we still have days to keep.
+        if delta >= datetime.timedelta( days=1 ) and day_count > 0 :
+            keep.add( date )
+            start_date = date
+            day_count -= 1
+
+    def select_field( field, keep_count ) :
+         current = -1
+         if keep_count > 0 :
+             keep_count += 1
+         for date in dates :
+             if getattr( date, field ) != current and keep_count != 0 :
+                 keep.add( date )
+                 current = getattr( date, field )
+                 keep_count -= 1
+
+    select_field( "month", keep_last_months )
+    select_field( "year",  keep_last_years  )
+
+    return keep
+
+#------------------------------------------------------------------------------
+def prune_snapshots( _ ) :
+    """
+    Remove old snapshot.
+    """
+
+    log( Verbosity.normal, f"\t *** Pruning snapshots ***" )
+
+    # Location of this script.
+    base_directory = os.path.realpath( os.path.dirname( sys.argv[ 0 ] ) )
+
+    # Regular expression to find only file names that match date snapshot.
+    pattern = re.compile( Configuration.date_regular_expression )
+
+    # Get a list of snapshots matching date format.
+    date_to_snapshot = {}
+    for file in os.listdir( Configuration.destination ) :
+        file_match = pattern.match( file )
+        if file_match is not None :
+            snapshot_name = file_match[ 1 ]
+            date = datetime.datetime.strptime( snapshot_name, Configuration.date_format )
+            date_to_snapshot[ date ] = file
+
+    files = list( date_to_snapshot.keys() )
+    # Figure out which snapshots to keep.
+    files_kept = prune(
+      files,
+      Configuration.keep_last_snapshots,
+      Configuration.keep_last_days,
+      Configuration.keep_last_months,
+      Configuration.keep_last_years
+    )
+
+    # Compute which files should be removed.
+    files_removed = set( files ) - set( files_kept )
+
+    # Remove unneeded snapshots.
+    log( Verbosity.normal, len( files_removed ), "snapshot(s) to remove" )
+    for file in files_removed :
+        snapshot_name = date_to_snapshot[ file ]
+        full_name = os.path.join( Configuration.destination, snapshot_name )
+        log( Verbosity.normal, "\t\t Removing:", snapshot_name )
+
+        if not Configuration.dry_run :
+            run_process( [ Configuration.btrfs, "subvolume", "delete", full_name ] )
+
+            changes_file = full_name + ".txt"
+            if os.path.exists( changes_file ):
+                os.remove( changes_file )
+
+#------------------------------------------------------------------------------
+def send_snapshot( _ ) :
+    """
+    Send/synchronize snapshots from a source to a destination.
+    Useful for copying snapshots to a backup drive.  Includes ability to transfer over SSH.
+    """
+
+    log( Verbosity.normal, f"\t *** Sending snapshot ***" )
+
+    # Location of this script.
+    base_directory = os.path.realpath( os.path.dirname( sys.argv[ 0 ] ) )
+
+    # Regular expression to find only file names that match date snapshot.
+    pattern = re.compile( Configuration.date_regular_expression )
+
+    # Snapshots currently in source.
+    source_files = \
+        set( file for file in os.listdir( Configuration.source ) if pattern.match( file ) is not None )
+
+    # Snapshots currently in destination.
+    # Must use SSH if files are on a remote system.
+    if Configuration.remote is not None :
+        # Get a list of files using SSH.
+        process = run_process( [ "ssh", Configuration.remote, f"ls {Configuration.destination}" ] )
+
+        # Split the output into individual file names.
+        process_output = process.stdout.decode()
+        file_list = process_output.split( "\n" )
+
+    else :
+        file_list = os.listdir( Configuration.destination )
+
+    # Filter for only the file names that are dates.
+    # This will give us a list of dates already on the system.
+    destination_files = set( file for file in file_list if pattern.match( file ) is not None )
+
+    # Create a temporary file used to write the script about to be run.
+    temp_script_file = tempfile.NamedTemporaryFile( mode="w", delete=False )
+
+    # Start script with heading.
+    temp_script_file.write( SCRIPT_HEADING )
+
+    # If there are currently no snapshots at remote location, copy first snapshot.
+    if len( destination_files ) == 0 and len( source_files ) > 0 :
+
+        # Get oldest snapshot.  It will serve as the basis for all subsequent snapshots.
+        sorted_destination = list( source_files )
+        sorted_destination.sort()
+        first_file = sorted_destination[ 0 ]
+
+        # We now have this snapshot so add it to list.
+        destination_files.add( first_file )
+
+        log( Verbosity.normal, "\t No initial snapshot." )
+
+        full_name = os.path.join( Configuration.source, first_file )
+
+        print( "\n# Send initial snapshot", file=temp_script_file )
+
+        # Send command.
+        command = f"{Configuration.btrfs} send '{full_name}' | "
+
+        # Receive side of command.
+        receive_command = f"{Configuration.btrfs} receive '{Configuration.destination}'"
+
+        # Amend receive command to command based on if SSH is needed.
+        if Configuration.remote is not None :
+            command += f"ssh {Configuration.remote} \"{receive_command}\""
+        else :
+            command += receive_command
+
+        # Add error checking to command.
+        command += f""" || fail "Unable to exchange snapshot from '{full_name}' to '{Configuration.destination}'"\n"""
+
+        temp_script_file.write( command )
+
+
+    # Snapshots that need to be copied over.
+    new_files = list( source_files - destination_files )
+    new_files.sort()
+
+    # Snapshots that have been removed.
+    removed_files = list( destination_files - source_files )
+    removed_files.sort()
+
+    # Remove old snapshots
+    # Do this first to free up space before taking up more space.
+    log( Verbosity.normal, "\t Removing", len( removed_files ), "old snapshot(s)..." )
+    print( "\n# Files to remove:", len( removed_files ), file=temp_script_file )
+    for file in removed_files :
+
+        log( Verbosity.normal, "\t\t", file )
+        full_name = os.path.join( Configuration.destination, file )
+
+        # Delete command.
+        command = f"{Configuration.btrfs} subvolume delete '{full_name}'"
+
+        # If the target is on a remote host, add SSH.
+        if Configuration.remote is not None :
+            command = f"ssh {Configuration.remote} \"{command}\""
+
+        # Add error checking to command.
+        command += f""" || fail "Unable to remove snapshot '{full_name}'" \n"""
+
+        temp_script_file.write( command )
+
+    source_files_list = list( source_files )
+    source_files_list.sort()
+
+    # Copy new snapshots.
+    log( Verbosity.normal, "\t Copying", len( new_files ), "new snapshot(s)..." )
+    print( "\n# Files to send:", len( new_files ), file=temp_script_file )
+    for file in new_files :
+        log( Verbosity.normal, "\t\t", file )
+        full_name = os.path.join( Configuration.source, file )
+
+        file_index = source_files_list.index( file )
+        previous_file = source_files_list[ file_index - 1 ]
+        previous_full_name = os.path.join( Configuration.source, previous_file )
+
+        # Send command.
+        command = f"{Configuration.btrfs} send -p '{previous_full_name}' '{full_name}' | "
+
+        # Receive side of command.
+        receive_command = f"{Configuration.btrfs} receive '{Configuration.destination}'"
+
+        # Amend receive command to command based on if SSH is needed.
+        if Configuration.remote is not None :
+            command += f"ssh {Configuration.remote} \"{receive_command}\""
+        else :
+            command += receive_command
+
+        # Add error checking to command.
+        command += f""" || fail "Unable to exchange snapshot from '{full_name}' to '{Configuration.destination}'"\n"""
+
+        temp_script_file.write( command )
+
+    # Done writing to script file.
+    temp_script_file.close()
+
+    # If actually running command...
+    if not Configuration.dry_run :
+        # Add execute attribute to temp file.
+        file_stat = os.stat( temp_script_file.name )
+        os.chmod( temp_script_file.name, file_stat.st_mode | stat.S_IEXEC )
+
+        # Run script that actually does work.
+        run_process( [ temp_script_file.name ] )
+    else:
+        # In a dry run, display the script.
+        with open( temp_script_file.name, "r" ) as input_file :
+            log( Verbosity.normal, input_file.read() )
+
+    # Done with temp file so remove it.
+    os.unlink( temp_script_file.name )
+
+#------------------------------------------------------------------------------
+def take_snapshot( _ ) :
+    """
+    Take a snapshot.
+    """
+
+    if Configuration.source is None :
+        error( f"Must specify a source." )
+
+    if Configuration.destination is None :
+        error( f"Must specify a destination." )
+
+    if not os.path.exists( Configuration.source ) :
+        error( f"Cannot find source '{Configuration.source}'." )
+
+    if not os.path.exists( Configuration.destination ) :
+        error( f"Cannot find destination '{Configuration.destination}'." )
+
+    log( Verbosity.normal, f"\t *** Taking snapshot ***" )
+
+    # Get the timestamp for snapshot.
+    current_time = datetime.datetime.now()
+    timestamp = current_time.strftime( Configuration.snapshot_name_format )
+
+    # Path to snapshot to be created.
+    snapshot_name = f"{Configuration.destination}/{timestamp}"
+
+    if Configuration.name is not None :
+        snapshot_name += f" -- {Configuration.name}";
+
+    if os.path.exists( snapshot_name ) :
+        error( f"Snapshot {timestamp} already exists!" )
+
+    if not Configuration.dry_run :
+        # Take snapshot.
+        command = [
+            Configuration.btrfs,
+            "subvolume",
+            "snapshot",
+            "-r",
+            Configuration.source,
+            snapshot_name
+        ]
+        run_process( command )
+
+    # File that holds the path to the last snapshot taken.
+    last_snapshot_file = f"{Configuration.destination}/lastSnapshot.txt"
+    previous_snapshot = None
+    if os.path.exists( last_snapshot_file ) :
+        with open( last_snapshot_file, "r" ) as input_file :
+            previous_snapshot = input_file.read().strip()
+
+    # File holding differences for new snapshot.
+    difference_file = f"{snapshot_name}.txt"
+
+    write_last_snapshot = True
+
+    # Do we have a previous snapshot to compare against?
+    if previous_snapshot is not None and os.path.exists( previous_snapshot ) :
+        previous_short = os.path.basename( previous_snapshot )
+        snapshot_short = os.path.basename( snapshot_name )
+        log( Verbosity.normal, f"\t Compare '{previous_short}' with '{snapshot_short}'." )
+
+        # Don't execute command for dry-runs or forced snapshots.
+        if not Configuration.dry_run and not Configuration.force :
+            # Use `rsync` to compare the current snapshot with the previous.
+            command = [
+                Configuration.rsync,
+                "-ainO",
+                "--del",
+                "--dry-run"
+            ]
+
+            if Configuration.rsync_options is not None :
+                if isinstance( Configuration.rsync_options, list ) :
+                    command += Configuration.rsync_options
+                else :
+                    command += [ Configuration.rsync_options ]
+
+            command += [
+                f"{previous_snapshot}/",
+                f"{snapshot_name}/"
+            ]
+
+            process = run_process( command )
+            changes = process.stdout.decode()
+            write_last_snapshot = ( len( changes ) > 0 )
+
+            # If there are no changes, remove this snapshot.
+            if not write_last_snapshot :
+                log( Verbosity.normal, "\t No changes detected, removing unneeded snapshot." )
+                run_process( [ Configuration.btrfs, "subvolume", "delete", snapshot_name ] )
+            elif Configuration.rsync_change_file :
+                with open( difference_file, "w" ) as change_file :
+                    print( changes, file=change_file )
+
+
+    # If this is now the last snapshot...
+    if write_last_snapshot :
+        log( Verbosity.normal, "\t Updating to new snapshot." )
+
+        # Write the snapshot name to file.
+        if not Configuration.dry_run :
+            with open( last_snapshot_file, "w" ) as last_snapshot :
+                print( snapshot_name, end="", file=last_snapshot )
+
+#------------------------------------------------------------------------------
+def check_configuration( _ ) :
+    """
+    Check configuration file.
+    """
+
+    is_error = False
+    def warn( message ) :
+        nonlocal is_error
+        log( Verbosity.error, f"\t {message}", file=sys.stderr )
+        is_error = True
+
+    if not os.path.exists( Configuration.btrfs ) :
+        warn( f"btrfs utility not found '{Configuration.btrfs}'" )
+
+    if not os.path.exists( Configuration.rsync ) :
+        warn( f"rsync utility not found '{Configuration.rsync}'" )
+
+    if Configuration.keep_last_snapshots < -1 :
+        warn( f"'keep_last_snapshots' must be -1 (for disabled), 0 (keep none) or greater." )
+
+    if Configuration.keep_last_days < -1 :
+        warn( f"'keep_last_days' must be -1 (for disabled), 0 (keep none) or greater." )
+
+    if Configuration.keep_last_months < -1 :
+        warn( f"'keep_last_months' must be -1 (for disabled), 0 (keep none) or greater." )
+
+    if Configuration.keep_last_years < -1 :
+        warn( f"'keep_last_years' must be -1 (for disabled), 0 (keep none) or greater." )
+
+    try:
+        date_regular_expression = re.compile( Configuration.date_regular_expression )
+
+        now = datetime.datetime.now()
+        timestamp = now.strftime( Configuration.date_format )
+
+        if not date_regular_expression.match( timestamp ) :
+            warn( "Timestamp regular expression isn't matching up date format." )
+
+    except re.error:
+        warn( f"date_regular_expression is not a valid regex pattern" )
+
+    if is_error :
+        exit( 1 )
+
+    log( Verbosity.normal, "\t Configuration valid" )
+
+#------------------------------------------------------------------------------
+def test( arguments ) :
+    """
+    Simulate taking snapshots over period of years.
+    """
+
+    log( Verbosity.normal, "\t *** Snapshot simulation ***" )
+    if arguments.minutes_interval <= 0 :
+        error( f"Cannot have a minute interval of {arguments.minutes_interval}" )
+
+    # Start with the current date/time.
+    date_as_tuple = list( datetime.datetime.now().timetuple() )
+
+    # Round the time to the nearest minutes interval.  Seconds are dropped.
+    date_as_tuple[ 4 ] += arguments.minutes_interval // 2
+    date_as_tuple[ 4 ] //= arguments.minutes_interval
+    date_as_tuple[ 4 ] *= arguments.minutes_interval
+    date_as_tuple[ 4 ] %= 60
+
+    # Convert the rounded time back to `datetime`.
+    truncated_tuple = date_as_tuple[ : 5 ]
+    now = datetime.datetime( *truncated_tuple )
+
+    # Calculate starting date.
+    days = int( arguments.years * 365.2425 )
+    current_date = now - datetime.timedelta( days=days )
+
+    log( Verbosity.normal, "\t\t Starting", current_date, "(" + str( arguments.years ) + " years ago)" )
+    log( Verbosity.normal, "\t\t Counting in", arguments.minutes_interval, "minute intervals." )
+    log( Verbosity.normal, "\t Simulating...", flush=True )
+
+    dates = []
+    last_hour = -1
+    time_delta = datetime.timedelta( minutes=+arguments.minutes_interval )
+
+    # Loop until the simulated date reaches current time.
+    while current_date <= now :
+        if ( current_date.hour >= arguments.start_hour and current_date.hour <= arguments.end_hour ) \
+          or ( current_date.hour == arguments.forced_hour and last_hour != current_date.hour and current_date.minute == arguments.forced_minute ) :
+            dates.append( current_date )
+            dates = prune(
+                dates,
+                Configuration.keep_last_snapshots,
+                Configuration.keep_last_days,
+                Configuration.keep_last_months,
+                Configuration.keep_last_years
+            )
+            dates = list( dates )
+
+        last_hour = current_date.hour
+        current_date += time_delta
+
+    log( Verbosity.normal, "\t\t", len( dates ), "snapshots remaining." )
+    dates.sort( reverse=True )
+    for date in dates :
+        time_stamp = date.strftime( Configuration.date_format )
+        log( Verbosity.normal, "\t", time_stamp )
+
+#------------------------------------------------------------------------------
+def parse_command_line_arguments() :
+    """
+    Handle command line arguments to program.
+    """
+
+    parser = argparse.ArgumentParser(
+        description=PROGRAM_TITLE,
+        epilog=__copyright__
+    )
+
+    parser.add_argument(
+        '--version',
+        action='version',
+        version="BTRFS Snapshot Tool v" + PROGRAM_VERSION
+    )
+
+    parser.add_argument(
+        '--config',
+        type=str,
+        help='Path to Configuration file.'
+    )
+
+    parser.add_argument(
+        '--btrfs',
+        type=str,
+        help='Path/command for btrfs.  May include "sudo".'
+    )
+
+    parser.add_argument(
+        '--date-format',
+        type=str,
+        help='Date format.'
+    )
+
+    parser.add_argument(
+        '-q',
+        '--quiet',
+        dest='quiet',
+        action='store_true',
+        default=False,
+        help='Quiet operation (error still printed).'
+    )
+
+    parser.add_argument(
+        '-d',
+        '--dry-run',
+        dest='dry_run',
+        action='store_true',
+        default=False,
+        help='Do not actually make changes.'
+    )
+
+    parser.add_argument(
+        '--name',
+        metavar='name',
+        default=None,
+        type=str,
+        help='Name of snapshot (none by default).'
+    )
+
+    parser.add_argument(
+        '--snapshot-name-format',
+        metavar='snapshot_name_format',
+        default=None,
+        type=str,
+        help='The date timestamp for snapshot names.'
+    )
+
+    parser.add_argument(
+         '--keep-last-snapshots',
+         metavar = 'keep_last_snapshots',
+         default = None,
+         type = int,
+         help = 'Most recent number of snapshots to keep.'
+    )
+
+    parser.add_argument(
+         '--keep-last-days',
+         metavar = 'keep_last_days',
+         default = None,
+         type = int,
+         help = 'Number of most recent days to keep.'
+    )
+
+    parser.add_argument(
+         '--keep-last-months',
+         metavar = 'keep_last_months',
+         default = None,
+         type = int,
+         help = 'Number of most recent months to keep.'
+    )
+
+    parser.add_argument(
+         '--keep-last-years',
+         metavar = 'keep_last_years',
+         default = None,
+         type = int,
+         help = 'Number of most recent years to keep.'
+    )
+
+    parser.add_argument(
+         '--date-regular-expression',
+         metavar = 'date_regular_expression',
+         default = None,
+         type = str,
+         help = 'Regular expression to match snapshots.'
+    )
+
+    # Setup a sub-parser to handle all the modes of operation.
+    sub_parser = parser.add_subparsers( help='Mode of operation.', dest="mode" )
+    sub_parser.required = True
+
+    #
+    # Subparser for pruning snapshots.
+    #
+    prune_parser = sub_parser.add_parser( 'prune', help='Prune snapshots.' )
+
+    prune_parser.add_argument(
+        'destination',
+        metavar = 'destination',
+        nargs = '?',
+        type=str,
+        help='Location of snapshot directory.'
+    )
+
+    #
+    # Subparser for sending snapshots.
+    #
+    send_parser = sub_parser.add_parser( 'send', help='Send snapshots to external location.' )
+
+    send_parser.add_argument(
+        'source',
+        metavar = 'source',
+        type = str,
+        help = 'Source location of snapshot directory.'
+    )
+
+    send_parser.add_argument(
+        'destination',
+        metavar = 'destination',
+        type = str,
+        help = 'Destination location of snapshot directory.'
+    )
+
+    send_parser.add_argument(
+         'remote',
+         metavar = 'remote',
+         default = None,
+         nargs = '?',
+         type = str,
+         help = 'Remote SSH server.'
+    )
+
+    #
+    # Subparser for taking snapshots.
+    #
+    take_parser = sub_parser.add_parser( 'take', help='Take a snapshot.' )
+
+    take_parser.add_argument(
+        'source',
+        metavar = 'source',
+        type = str,
+        nargs = '?',
+        help = 'Source volume/subvolume path.'
+    )
+
+    take_parser.add_argument(
+        'destination',
+        metavar = 'destination',
+        type = str,
+        nargs = '?',
+        help = 'Destination location of snapshot directory.'
+    )
+
+    take_parser.add_argument(
+        '-f',
+        '--force',
+        dest='force',
+        action='store_true',
+        default=False,
+        help='Force snapshot even if there are no changes.'
+    )
+
+    #
+    #
+    #
+
+    # Subparser for testing snapshot pruning.
+    check_parser = sub_parser.add_parser(
+        'check',
+        help='Check configuration for validity.'
+    )
+
+    check_parser.add_argument(
+        'config',
+        metavar = 'config',
+        type = str,
+        help = 'Path to Configuration file.'
+    )
+
+    # Subparser for testing snapshot pruning.
+    test_parser = sub_parser.add_parser(
+        'test',
+        help='Test snapshot pruning.',
+        description="Display the resulting snapshots after some simulated period of time.",
+    )
+
+    test_parser.add_argument(
+         '--years',
+         metavar = 'years',
+         default = 5,
+         type = int,
+         help = 'Number of years for simulation.'
+    )
+
+    test_parser.add_argument(
+         '--minutes-interval',
+         metavar = 'minutes_interval',
+         default = 60,
+         type = int,
+         help = 'Minutes between snapshots.'
+    )
+
+    test_parser.add_argument(
+         '--start-hour',
+         metavar = 'start_hour',
+         default = 0,
+         type = int,
+         help = 'When changes to snapshots begin.'
+    )
+
+    test_parser.add_argument(
+         '--end-hour',
+         metavar = 'end_hour',
+         default = 24,
+         type = int,
+         help = 'When changes to snapshots end.'
+    )
+
+    test_parser.add_argument(
+         '--forced-hour',
+         metavar = 'forced_hour',
+         default = -1,
+         type = int,
+         help = 'Force a snapshot at this hour.'
+    )
+
+    test_parser.add_argument(
+         '--forced-minute',
+         metavar = 'forced_minute',
+         default = 0,
+         type = int,
+         help = 'Force a snapshot at this minute.'
+    )
+
+    return parser.parse_args()
+
+#------------------------------------------------------------------------------
+if __name__ == "__main__":
+
+    MODES = {
+        "prune" : prune_snapshots,
+        "send"  : send_snapshot,
+        "take"  : take_snapshot,
+        "check" : check_configuration,
+        "test"  : test
+    }
+
+    arguments = parse_command_line_arguments()
+
+    if arguments.quiet :
+        Configuration.verbosity = Verbosity.quiet
+
+    log( Verbosity.normal, f"{PROGRAM_TITLE}" )
+
+    if getattr( arguments, "config" ) is not None :
+        log( Verbosity.normal, f"\t Loading configuration '{arguments.config}'." )
+        Configuration.load( arguments.config )
+
+    # Place all arguments into configuration.
+    for key, value in vars( arguments ).items() :
+        if hasattr( Configuration, key ) and value is not None :
+            setattr( Configuration, key, value )
+
+    Configuration.dry_run = arguments.dry_run
+
+    if arguments.mode in MODES :
+        function = MODES[ arguments.mode ]
+        function( arguments )
+    else :
+        error( f"Unimplemented mode '{arguments.mode}'." )
+
+"""
+    BTRFS Rotating Snapshot Tool
+    Copyright (C) 2022  Andrew Que
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+    "If you think your users are idiots, only idiots will use it."
+    - Linus Torvalds
+"""

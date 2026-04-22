@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Problems? Sugestions? Visit: https://www.notengobattery.com
+# Problems? Suggestions? software@notengobattery.com
 #
 
 . /lib/functions.sh
@@ -17,20 +17,8 @@ ETC_CONFIG_OVERLAY=${OVERLAYFS}${ETC_CONFIG_UPPER}
 prepare_root_ntb() {
   _prepare_root_ntb() {
     printf "prepare_root: running external root filesystem preparation" >/dev/kmsg
-    mknod_dev() {
-      rm -f $1
-      mknod -m 600 $1 $2 $MAJOR $MINOR
-    }
+    mknod_dev() { rm -f $1; mknod -m 600 $1 $2 $MAJOR $MINOR; }
     case $(board_name) in
-    glinet,gl-s1300)
-      BOOTFS_NODE_TYPE=b
-      BOOTFS_OPTIONS='relatime'
-      BOOTFS_TYPE=jffs2
-      BOOTFS_UEVENT=/sys/block/mtdblock11/uevent
-      OVERLAY_NODE_TYPE=b
-      OVERLAY_OPTIONS='relatime'
-      OVERLAY_UEVENT=/sys/block/mmcblk0/mmcblk0p4/uevent
-      ;;
     linksys,ea6350v3 | \
       linksys,ea8300 | \
       linksys,mr8300 | \

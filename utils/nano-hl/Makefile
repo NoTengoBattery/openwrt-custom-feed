@@ -1,6 +1,6 @@
 #
 # Copyright (C) 2007-2016 OpenWrt.org
-# Copyright (C) 2019-2021 Oever González <software@notengobattery.com>
+# Copyright (C) 2019-2026 Oever González <software@notengobattery.com>
 #
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
@@ -9,12 +9,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=nano
-PKG_VERSION:=7.2
+PKG_VERSION:=9.0
 PKG_RELEASE:=0
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=@GNU/nano
-PKG_HASH:=86f3442768bd2873cec693f83cdf80b4b444ad3cc14760b74361474fc87a4526
+PKG_HASH:=9f384374b496110a25b73ad5a5febb384783c6e3188b37063f677ac908013fde
 
 PKG_LICENSE:=GPL-3.0-or-later
 PKG_LICENSE_FILES:=COPYING

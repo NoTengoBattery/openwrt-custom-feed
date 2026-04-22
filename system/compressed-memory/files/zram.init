@@ -1,9 +1,9 @@
 #!/bin/sh /etc/rc.common
 #
-# Copyright (C) 2019-2021 Oever González <software@notengobattery.com>
+# Copyright (C) 2019-2026 Oever González <software@notengobattery.com>
 #
 # Licensed to the public under the Apache License 2.0.
-# Problems? Sugestions? Visit: https://www.notengobattery.com
+# Problems? Suggestions? software@notengobattery.com
 #
 
 START=15
