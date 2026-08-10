@@ -68,6 +68,8 @@ endef
 define Package/notengobattery-defaults/install
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_DATA) ./files/notengobattery.defaults $(1)/etc/uci-defaults/99_1notengobattery
+	$(INSTALL_DIR) $(1)/usr/libexec
+	$(INSTALL_BIN) ./files/board_hostname.script $(1)/usr/libexec/ntb_board_hostname
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/unbound.uci $(1)/etc/config/unbound
 	$(INSTALL_DIR) $(1)/etc/unbound

@@ -56,10 +56,12 @@ define Package/notengobattery-scripts
 	+kmod-io-schedulers \
 	+lsblk \
 	+mtd \
+	+notengobattery-defaults \
 	+shadow-chsh \
 	+shadow-utils \
 	+swap-zram \
-	+swap-zswap
+	+swap-zswap \
+	+uboot-envtools
 	TITLE:=Customized script files for OpenWrt
 	MAINTAINER:=Oever Gonzalez <software@notengobattery.com>
 	URL:=https://www.notengobattery.com/
