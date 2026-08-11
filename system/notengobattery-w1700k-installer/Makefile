@@ -19,6 +19,14 @@ include $(INCLUDE_DIR)/package.mk
 
 # BIN_DIR is already bin/targets/<board>/<subtarget>.
 W1700K_BIN_DIR:=$(BIN_DIR)
+W1700K_IMAGES:=$(wildcard \
+	$(W1700K_BIN_DIR)/*-gemtek_w1700k-ubi-initramfs-recovery.itb \
+	$(W1700K_BIN_DIR)/*-gemtek_w1700k-ubi-squashfs-sysupgrade.itb)
+
+# The payload is copied in at install time, so nothing else would notice when the
+# images change and the stale .apk would be reused. Hash them into the prepared
+# stamp instead.
+PKG_FILE_DEPENDS:=$(W1700K_IMAGES)
 
 
 define Package/notengobattery-w1700k-installer
