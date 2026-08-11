@@ -20,6 +20,7 @@ ntb_board_hostname() {
   avm,fritzbox-4040) echo FritzBox-4040 ;;
   cwwk-cw-mbx-ad12) echo MBX-AD12 ;;
   ezviz,cs-w3-wd1200g-eup) echo CS-W3-WD1200G-EUP ;;
+  gemtek,w1700k-ubi) echo W1700K ;;
   glinet,gl-b1300) echo Convexa-B ;;
   glinet,gl-s1300) echo Convexa-S ;;
   hiveton,h5000m) echo H5000M ;;
