@@ -1,0 +1,7 @@
+# Runs the UBI installer from preinit, so booting the installer image installs.
+#
+# Vendored from https://github.com/hurrian/w1700k-ubi-installer
+#   files/lib/preinit/00_installer
+# Copyright (C) hurrian and contributors.  Licensed under the GNU GPL v3.
+
+/installer/install.sh
