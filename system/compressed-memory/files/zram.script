@@ -16,10 +16,10 @@ extra_command "status" "Show statistics for zram"
 config_load $CONFIG
 config_get ALGORITHM zram algorithm 'deflate'
 config_get DRIVER $ALGORITHM driver 'deflate'
-config_get EXPECTED_RATIO $ALGORITHM expected_ratio '4.75'
+config_get EXPECTED_RATIO $ALGORITHM expected_ratio '3.15'
 config_get_bool ZSWAP_ENABLED zswap enabled '0'
 ZSWAP_POOL=0
-ZSWAP_RATIO='3.45'
+ZSWAP_RATIO='2.30'
 
 _zram_mounted() {
 	if [ $(grep -cs zram /proc/swaps) -ne 0 ]; then
@@ -43,12 +43,12 @@ check_zswap() {
 			export ZSWAP_POOL
 			config_get DRIVER $ALGORITHM driver "$ALGORITHM"
 			export DRIVER
-			config_get EXPECTED_RATIO $ALGORITHM expected_ratio '2.100'
+			config_get EXPECTED_RATIO $ALGORITHM expected_ratio '3.20'
 			export EXPECTED_RATIO
 			# Get zswap's compressor ratio for effective ratio calculation
 			local zswap_algo
 			config_get zswap_algo zswap algorithm 'lz4'
-			config_get ZSWAP_RATIO $zswap_algo expected_ratio '2.100'
+			config_get ZSWAP_RATIO $zswap_algo expected_ratio '2.30'
 			export ZSWAP_RATIO
 			return 0
 		else
