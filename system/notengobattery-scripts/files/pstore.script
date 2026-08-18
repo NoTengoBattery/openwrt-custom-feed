@@ -18,10 +18,9 @@ if [ "x$ACTION" = "xstratum" ]; then
     mkdir -p $output_dir
     mv -f /sys/fs/pstore/* $output_dir
     for stored in $output_dir/*; do
-      bzip2 -9 $stored &
-      if [ $? -eq 0 ]; then
-        printf "pstore: collected an compressed $(basename $stored) from last boot" >/dev/kmsg
-      fi
+      if bzip2 -9 $stored; then
+        printf "pstore: collected and compressed $(basename $stored) from last boot" >/dev/kmsg
+      fi &
     done
   fi
 fi
