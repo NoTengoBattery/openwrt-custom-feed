@@ -1,0 +1,152 @@
+#!/bin/sh
+
+# Airoha XR1710G U-Boot recovery RPC backend for LuCI.
+# Arms the native one-shot recovery trigger without changing bootcmd.  U-Boot
+# clears and saves the trigger before starting the HTTP recovery server.
+
+. /lib/functions.sh
+
+RECOVERY_TRIGGER="recovery_trigger"
+
+is_supported()
+{
+	[ "$(board_name 2>/dev/null)" = "gemtek,xr1710g-ubi" ] || return 1
+	[ -x /usr/sbin/fw_setenv ] || return 1
+	[ -x /usr/sbin/fw_printenv ] || return 1
+	[ -r /etc/fw_env.config ] || return 1
+	return 0
+}
+
+boot_env_defaults()
+{
+	cat <<-'EOF'
+		loadaddr 0x81800000
+		bootconf config-1
+		bootargs console=ttyS0,115200 earlycon ubi.block=0,fit root=/dev/fit0 rootwait rdinit=/sbin/init
+		boot_ubi ubi part ubi && run boot_production
+		boot_production run ubi_read_production && bootm ${loadaddr}#${bootconf}
+		bootcmd run boot_ubi || http_recovery
+		ubi_read_production ubi read ${loadaddr} fit
+		recovery_addr 0x81800000
+		recovery_mtd fit
+		recovery_ubi_part ubi
+		recovery_dev_uboot spi-nand0
+		uboot_ofs 0x600000
+		recovery_size_uboot 0x100000
+	EOF
+}
+
+ensure_boot_env()
+{
+	local var value force="${1:-0}"
+
+	# Once a valid environment exists, U-Boot replaces its compiled-in
+	# defaults with it.  Make sure the boot-critical variables are present
+	# (e.g. after a fresh flash where the ubootenv volumes are empty) so a
+	# normal boot still works after the one-shot recovery trigger is gone.
+	if [ "$force" = 1 ]; then
+		boot_env_defaults | /usr/sbin/fw_setenv -s -
+		return $?
+	fi
+
+	boot_env_defaults | while read -r var value; do
+		if ! /usr/sbin/fw_printenv -n "$var" >/dev/null 2>&1; then
+			/usr/sbin/fw_setenv "$var" "$value" || exit 1
+		fi
+	done
+}
+
+get_status()
+{
+	local board="$(board_name 2>/dev/null)"
+	local supported=0
+	local reason="unsupported-board"
+	local recovery_active=0
+	local bootcmd=""
+
+	if [ "$board" = "gemtek,xr1710g-ubi" ]; then
+		if [ ! -x /usr/sbin/fw_setenv ] || [ ! -x /usr/sbin/fw_printenv ]; then
+			reason="uboot-envtools-missing"
+		elif [ ! -r /etc/fw_env.config ]; then
+			reason="fw-env-config-missing"
+		else
+			supported=1
+			reason=""
+			/usr/sbin/fw_printenv -n "$RECOVERY_TRIGGER" >/dev/null 2>&1 && \
+				recovery_active=1
+
+			# Recognize state left by older package releases as active too.
+			bootcmd=$(/usr/sbin/fw_printenv -n bootcmd 2>/dev/null)
+			case "$bootcmd" in
+				*airoha_recovery_once*|http_recovery|run\ http_recovery)
+					recovery_active=1
+					;;
+			esac
+		fi
+	fi
+
+	printf '{"supported":%d,"reason":"%s","recovery_active":%d}\n' \
+		"$supported" "$reason" "$recovery_active"
+}
+
+reboot_to_uboot()
+{
+	local bootcmd loadaddr env_bootstrapped=0
+
+	is_supported || {
+		printf '{"success":false,"error":"U-Boot environment is unavailable"}\n'
+		return 0
+	}
+
+	if /usr/sbin/fw_printenv -n "$RECOVERY_TRIGGER" >/dev/null 2>&1; then
+		printf '{"success":false,"error":"Device is already configured to boot into U-Boot recovery"}\n'
+		return 0
+	fi
+
+	bootcmd=$(/usr/sbin/fw_printenv -n bootcmd 2>/dev/null)
+	case "$bootcmd" in
+		*airoha_recovery_once*|http_recovery|run\ http_recovery)
+			printf '{"success":false,"error":"Device is already configured to boot into U-Boot recovery"}\n'
+			return 0
+			;;
+	esac
+
+	loadaddr=$(/usr/sbin/fw_printenv -n loadaddr 2>/dev/null)
+	if ! /usr/sbin/fw_printenv -n boot_ubi >/dev/null 2>&1 || \
+	   [ "$bootcmd" = "run distro_bootcmd" ] || [ "$loadaddr" = "0x0" ]; then
+		env_bootstrapped=1
+	fi
+
+	ensure_boot_env "$env_bootstrapped" || {
+		printf '{"success":false,"error":"Cannot ensure boot environment"}\n'
+		return 0
+	}
+
+	/usr/sbin/fw_setenv "$RECOVERY_TRIGGER" 1 || {
+		printf '{"success":false,"error":"Cannot set recovery trigger"}\n'
+		return 0
+	}
+
+	sync
+	( sleep 1; /sbin/reboot ) >/dev/null 2>&1 </dev/null &
+	printf '{"success":true}\n'
+}
+
+case "$1" in
+	list)
+		printf '{"getStatus":{},"rebootToUboot":{}}\n'
+		;;
+	call)
+		case "$2" in
+			getStatus)
+				get_status
+				;;
+			rebootToUboot)
+				reboot_to_uboot
+				;;
+			*)
+				printf '{"error":"Invalid method"}\n'
+				;;
+		esac
+		;;
+esac
